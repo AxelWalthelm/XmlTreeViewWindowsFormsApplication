@@ -15,7 +15,7 @@
         {
             if (disposing)
             {
-                UnregisterEvents();
+                Clear();
             }
 
             if (disposing && (components != null))

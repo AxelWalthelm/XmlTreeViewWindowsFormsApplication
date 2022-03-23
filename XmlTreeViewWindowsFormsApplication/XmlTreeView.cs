@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
+using System.Xml.XPath;
 
 namespace XmlTreeViewWindowsFormsApplication
 {
@@ -18,15 +19,118 @@ namespace XmlTreeViewWindowsFormsApplication
     {
         protected class XmlTreeNode : TreeNode
         {
-            public XmlNode XmlNode;
-            public string ConstPrefix;
-            public string EditableValue;
+            public readonly XmlNode XmlNode;
+            private string ConstPrefix;
+            private string EditableValue;
 
-            public XmlTreeNode(XmlNode xmlNode, string constPrefix, string editableValue = null) : base(constPrefix + editableValue)
+            public new XmlTreeView TreeView => (XmlTreeView)base.TreeView;
+            public EditBox EditBox => TreeView._editBox;
+
+            public bool IsEditable => EditableValue != null;
+            public new bool IsEditing => TreeView.IsEditing;
+
+            public XmlTreeNode(XmlNode xmlNode)
             {
                 XmlNode = xmlNode;
-                ConstPrefix = constPrefix;
-                EditableValue = editableValue;
+            }
+
+            public void UpdateText()
+            {
+                if (XmlNode.NodeType == XmlNodeType.Element)
+                {
+                    bool isLeaf = !XmlNode.ChildNodes.Cast<XmlNode>().Any(n => n.NodeType == XmlNodeType.Element);
+                    var textChilds = XmlNode.ChildNodes.Cast<XmlNode>().Where(n => n.NodeType == XmlNodeType.Text).ToList();
+                    if (textChilds.Count <= 1 && isLeaf)
+                    {
+                        ConstPrefix = XmlNode.Name + " = ";
+                        EditableValue = textChilds.FirstOrDefault()?.Value ?? "";
+                    }
+                    else
+                    {
+                        ConstPrefix = XmlNode.Name;
+                        EditableValue = null;
+                    }
+                }
+                else if (XmlNode.NodeType == XmlNodeType.Comment)
+                {
+                    ConstPrefix = "# ";
+                    EditableValue = XmlNode.Value.Trim();
+                    this.ForeColor = Color.DarkGreen;
+                }
+
+                SetText(true);
+            }
+
+            private void SetText(bool showValue)
+            {
+                this.Text = showValue ? ConstPrefix + EditableValue : ConstPrefix;
+            }
+
+            public new void BeginEdit()
+            {
+                Debug.Assert(EditBox != null);
+                Debug.Assert(EditBox.XmlTreeNode == null);
+                Debug.Assert(IsEditable);
+                Debug.Assert(!IsEditing);
+
+                SetText(false);
+                Rectangle bounds = Bounds;
+                bounds.X += bounds.Width;
+                int borderX = GetSystemMetrics(SM_CXBORDER);
+                int borderY = GetSystemMetrics(SM_CYBORDER);
+                bounds.Inflate(borderX, borderY);
+                bounds.X -= 4; // TODO: check these magic values
+                bounds.Y -= 1;
+                bounds.Width = TreeView.ClientRectangle.Width - bounds.X;
+                EditBox.Bounds = bounds;
+                EditBox.Text = EditableValue;
+                EditBox.Visible = true;
+                EditBox.Focus();
+
+                Debug.Assert(!IsEditing);
+                EditBox.XmlTreeNode = this;
+                Debug.Assert(IsEditing);
+            }
+
+            public new void EndEdit(bool cancel)
+            {
+                Debug.Assert(EditBox != null);
+                Debug.Assert(EditBox.XmlTreeNode != null);
+                EditBox.Visible = false;
+                EditBox.XmlTreeNode = null;
+                TreeView.Focus(); // ensure focus goes to tree view (most of the time this happens automatically)
+
+                if (cancel || string.Equals(EditableValue, EditBox.Text, StringComparison.OrdinalIgnoreCase))
+                {
+                    SetText(true);
+                    return;
+                }
+
+#if false // fake it
+                EditableValue = EditBox.Text;
+                this.Text += EditableValue;
+#else // modify XML
+                if (XmlNode.NodeType == XmlNodeType.Comment)
+                {
+                    Match match = Regex.Match(XmlNode.Value ?? "", @"^(\s*).*?(\s*)$");
+                    Debug.Assert(match.Success);
+                    Debug.Assert(match.Groups.Count == 3);
+                    var value = match.Groups[1].Value + EditBox.Text + match.Groups[2].Value; // preverve spaces
+                    XmlNode.Value = value;
+                }
+                else if (XmlNode.NodeType == XmlNodeType.Element)
+                {
+                    if (XmlNode.ChildNodes.Count == 1 && XmlNode.ChildNodes[0].NodeType == XmlNodeType.Text)
+                    {
+                        XmlNode.ChildNodes[0].Value = EditBox.Text;
+                    }
+                    else
+                    {
+                        Debug.Assert(XmlNode.ChildNodes.Count == 0);
+                        XmlNode.InnerText = EditBox.Text;
+                    }
+                }
+#endif
             }
         }
 
@@ -34,6 +138,8 @@ namespace XmlTreeViewWindowsFormsApplication
         {
             public readonly XmlTreeView Host;
             public XmlTreeNode XmlTreeNode;
+
+            public bool IsEditing => XmlTreeNode != null && Visible;
 
             public EditBox(XmlTreeView host)
             {
@@ -84,24 +190,38 @@ namespace XmlTreeViewWindowsFormsApplication
                     BeginEdit((XmlTreeNode)this.SelectedNode);
                     e.Handled = IsEditing;
                     break;
+
+                // experimental!!!
+                case Keys.Delete:
+                    var node = (XmlTreeNode)this.SelectedNode;
+                    if (node != null)
+                    {
+                        node.XmlNode.ParentNode.RemoveChild(node.XmlNode);
+                        if (node.XmlNode.ChildNodes.Count > 0)
+                            node.XmlNode.RemoveChild(node.XmlNode.ChildNodes[0]);
+                    }
+                    e.Handled = IsEditing;
+                    break;
             }
         }
 
-        protected EditBox _editTextBox;
+        protected EditBox _editBox;
+        protected bool IsEditing => _editBox != null && _editBox.IsEditing;
 
-        protected XmlNode _root;
+        protected XmlNode _rootXmlNode;
+        protected XmlDocument _xmlDocument;
+        public XmlDocument XmlDocument => _xmlDocument;
 
-        protected readonly Dictionary<XmlNode, XmlTreeNode> _editableXmlNodes = new Dictionary<XmlNode, XmlTreeNode>();
+        protected readonly Dictionary<XmlNode, XmlTreeNode> _displayedNodes = new Dictionary<XmlNode, XmlTreeNode>();
 
         public XmlTreeView()
         {
             InitializeComponent();
             //base.LabelEdit = true;
-            _editTextBox = new EditBox(this);
-            //this.components.Add(_editTextBox);
+            _editBox = new EditBox(this);
         }
 
-#if true // activate double buffering to reduce flickering
+        #region Activate double buffering to reduce flickering
         private const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
         private const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
         private const int TVS_EX_DOUBLEBUFFER = 0x0004;
@@ -113,15 +233,29 @@ namespace XmlTreeViewWindowsFormsApplication
             SendMessage(this.Handle, TVM_SETEXTENDEDSTYLE, (IntPtr)TVS_EX_DOUBLEBUFFER, (IntPtr)TVS_EX_DOUBLEBUFFER);
             base.OnHandleCreated(e);
         }
-#endif
+        #endregion
 
+        #region Detect scrolling
+        private const int WM_VSCROLL = 0x0115;
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+
+            if (m.Msg == WM_VSCROLL)
+            {
+                this.EndEdit();
+            }
+        }
+        #endregion
+
+        #region Designer
         [Browsable(false)]
-        [Category("Appearance")]
+        [Category("Data")]
         [Description("The XML tree or sub-tree to be displayed.")]
         [DefaultValue(null)]
         public XmlNode Root
         {
-            get { return _root; }
+            get { return _rootXmlNode; }
             set { this.Init(value); }
         }
 
@@ -130,116 +264,193 @@ namespace XmlTreeViewWindowsFormsApplication
         [Description("Indicates whether the user can edit the XML.")]
         [DefaultValue(true)]
         public new bool LabelEdit { get; set; }
+        #endregion
 
         private void Init(XmlNode root)
         {
+            if (_rootXmlNode == root)
+                return;
+
             this.BeginUpdate();
 
-            if (_root != null)
-            {
-                UnregisterEvents();
-                this.Nodes.Clear();
-                this._editableXmlNodes.Clear();
-            }
+            Clear();
 
-            _root = root;
-            if (_root != null)
+            var xmlDocument = GetXmlDocument(root);
+            if (xmlDocument != null)
             {
-                PopulateTree(_root, this.Nodes);
+                _rootXmlNode = root;
+                _xmlDocument = xmlDocument;
+                UpdateTree(_rootXmlNode);
                 RegisterEvents();
             }
 
             this.EndUpdate();
         }
 
+        private void Clear()
+        {
+            if (_rootXmlNode != null)
+            {
+                UnregisterEvents();
+                this.Nodes.Clear();
+                this._displayedNodes.Clear();
+                _rootXmlNode = null;
+                _xmlDocument = null;
+            }
+        }
+
         private void RegisterEvents()
         {
-            XmlDocument document = XmlDocument;
-            document.NodeChanged += OnDocumentNodeModified;
-            document.NodeInserted += OnDocumentNodeModified;
-            document.NodeRemoved += OnDocumentNodeModified;
+            _xmlDocument.NodeChanged += OnDocumentNodeModified;
+            _xmlDocument.NodeInserted += OnDocumentNodeModified;
+            _xmlDocument.NodeRemoved += OnDocumentNodeModified;
         }
 
         private void UnregisterEvents()
         {
-            if (_root == null)
+            if (_rootXmlNode == null)
                 return;
 
-            XmlDocument document = XmlDocument;
-            document.NodeChanged -= OnDocumentNodeModified;
-            document.NodeInserted -= OnDocumentNodeModified;
-            document.NodeRemoved -= OnDocumentNodeModified;
+            _xmlDocument.NodeChanged -= OnDocumentNodeModified;
+            _xmlDocument.NodeInserted -= OnDocumentNodeModified;
+            _xmlDocument.NodeRemoved -= OnDocumentNodeModified;
         }
 
-        public XmlDocument XmlDocument
+        protected static XmlDocument GetXmlDocument(XmlNode node)
         {
-            get
-            {
-                var node = _root;
-                while (node != null && node.NodeType != XmlNodeType.Document)
-                    node = node.ParentNode;
+            while (node != null && node.NodeType != XmlNodeType.Document)
+                node = node.ParentNode;
 
-                return (XmlDocument)node;
-            }
+            return (XmlDocument)node;
         }
 
         private void OnDocumentNodeModified(object sender, XmlNodeChangedEventArgs e)
         {
-            if (_root == null)
+            if (_rootXmlNode == null)
                 return;
 
-            bool handled = false;
+            if (GetXmlDocument(_rootXmlNode) != _xmlDocument)
+            {
+                Clear(); // XML document did became invalid (e.g. root removed) => clear all
+                return;
+            }
+
+            if (_editBox.IsEditing && e.Node == _editBox.XmlTreeNode.XmlNode)
+            {
+                EndEdit(false); // someone else modfied XML? => cancel edit
+            }
+
             if (e.Action == XmlNodeChangedAction.Insert || e.Action == XmlNodeChangedAction.Change)
             {
-                XmlTreeNode node;
-                if (_editableXmlNodes.TryGetValue(e.Node, out node) ||
-                    _editableXmlNodes.TryGetValue(e.NewParent, out node))
-                {
-                    string newValue = e.NewValue;
-                    node.EditableValue = newValue;
-                    node.Text += newValue;
-                    handled = true;
-                }
+                UpdateNode(e.Node);
             }
             else if (e.Action == XmlNodeChangedAction.Remove)
             {
-
-            }
-
-            if (!handled)
-            {
-                throw new InvalidOperationException("unhandled XML change");
+                RemoveNode(e.Node);
             }
         }
 
-        private void PopulateTree(XmlNode xmlNode, TreeNodeCollection nodes)
+        private void UpdateNode(XmlNode xmlNode)
         {
-            foreach (XmlNode xmlChild in xmlNode.ChildNodes)
+            XmlTreeNode treeNode;
+            if (!_displayedNodes.TryGetValue(xmlNode, out treeNode))
             {
-                if (xmlChild.NodeType == XmlNodeType.Element)
+                if (xmlNode.NodeType == XmlNodeType.Element || xmlNode.NodeType == XmlNodeType.Comment)
                 {
-                    if (xmlChild.ChildNodes.Count == 0 || xmlChild.ChildNodes.Count == 1 && xmlChild.ChildNodes[0].NodeType == XmlNodeType.Text)
-                    {
-                        string value = xmlChild.ChildNodes.Count == 0 ? "" : xmlChild.ChildNodes[0].Value ?? "";
-                        var treeChild = new XmlTreeNode(xmlChild, xmlChild.Name + " = ", value);
-                        nodes.Add(treeChild);
-                        _editableXmlNodes[xmlChild] = treeChild;
-                    }
-                    else
-                    {
-                        var treeChild = new XmlTreeNode(xmlChild, xmlChild.Name);
-                        nodes.Add(treeChild);
-                        PopulateTree(xmlChild, treeChild.Nodes);
-                    }
-                }
-                else if (xmlChild.NodeType == XmlNodeType.Comment)
-                {
-                    var treeChild = new XmlTreeNode(xmlChild, "# ", xmlChild.Value.Trim());
-                    treeChild.ForeColor = Color.DarkGreen;
-                    nodes.Add(treeChild);
-                    _editableXmlNodes[xmlChild] = treeChild;
+                    treeNode = new XmlTreeNode(xmlNode);
+                    _displayedNodes[xmlNode] = treeNode;
                 }
             }
+
+            if (treeNode != null)
+            {
+                UpdateLinks(treeNode);
+                treeNode.UpdateText();
+            }
+
+            // some element types can influence how their parent is displayed => update parent text
+            if (xmlNode.NodeType == XmlNodeType.Text || xmlNode.NodeType == XmlNodeType.Element)
+            {
+                XmlTreeNode parentTreeNode;
+                if (xmlNode.ParentNode != null && _displayedNodes.TryGetValue(xmlNode.ParentNode, out parentTreeNode))
+                    parentTreeNode.UpdateText();
+            }
+        }
+
+        private void UpdateTree(XmlNode xmlNode)
+        {
+            UpdateNode(xmlNode);
+
+            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
+            {
+                UpdateTree(xmlChildNode);
+            }
+        }
+
+        private XmlTreeNode UpdateLinks(XmlTreeNode treeNode)
+        {
+            XmlNode xmlNode = treeNode.XmlNode;
+
+            // try to connect parent
+            TreeNodeCollection nodesOfParent = null;
+            if (xmlNode.ParentNode == _rootXmlNode)
+            {
+                nodesOfParent = this.Nodes;
+            }
+            else if (xmlNode.ParentNode != null)
+            {
+                XmlTreeNode parentTreeNode;
+                if (_displayedNodes.TryGetValue(xmlNode.ParentNode, out parentTreeNode))
+                {
+                    nodesOfParent = parentTreeNode.Nodes;
+                }
+            }
+
+            UpdateChildren(xmlNode.ParentNode, nodesOfParent);
+
+            // try to connect children
+            UpdateChildren(xmlNode, treeNode.Nodes);
+
+            return treeNode;
+        }
+
+        private void UpdateChildren(XmlNode xmlNode, TreeNodeCollection treeNodes)
+        {
+            if (xmlNode == null || treeNodes == null)
+                return;
+
+            var treeChilds = new List<XmlTreeNode>();
+            foreach (XmlNode xmlChild in xmlNode.ChildNodes.Cast<XmlNode>())
+            {
+                XmlTreeNode treeChild;
+                if (_displayedNodes.TryGetValue(xmlChild, out treeChild))
+                {
+                    treeChilds.Add(treeChild);
+                }
+            }
+
+            treeNodes.Clear();
+            treeNodes.AddRange(treeChilds.Cast<TreeNode>().ToArray());
+        }
+
+        private void RemoveNode(XmlNode xmlNode)
+        {
+            XmlTreeNode treeNode;
+            if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
+            {
+                treeNode.Remove();
+                _displayedNodes.Remove(xmlNode);
+            }
+        }
+
+        private void RemoveTree(XmlNode xmlNode)
+        {
+            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
+            {
+                RemoveTree(xmlChildNode);
+            }
+
+            RemoveNode(xmlNode);
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -317,86 +528,21 @@ namespace XmlTreeViewWindowsFormsApplication
                 return;
             }
 
-            if (node == null || node.EditableValue == null)
+            if (node == null || !node.IsEditable)
                 return;
 
             EndEdit();
 
-            EditBox edit = _editTextBox;
-            _editTextBox = null; // following code of BeginEdit may cause indirect calls to EndEdit(), which shall be ignored
-
-            edit.XmlTreeNode = node;
-            edit.Text = node.EditableValue;
-            if (!string.IsNullOrEmpty(node.ConstPrefix))
-            {
-                node.Text = node.ConstPrefix;
-//                var prefixSize = MeasureText(node.ConstPrefix);
-//                bounds.X += (int)prefixSize.Width;
-            }
-            Rectangle bounds = node.Bounds;
-            if (!string.IsNullOrEmpty(node.ConstPrefix))
-            {
-                bounds.X += bounds.Width;
-            }
-            int borderX = GetSystemMetrics(SM_CXBORDER);
-            int borderY = GetSystemMetrics(SM_CYBORDER);
-            bounds.Inflate(borderX, borderY);
-            bounds.X -= 4;
-            bounds.Y -= 1;
-            bounds.Width = this.ClientRectangle.Width - bounds.X;
-            edit.Bounds = bounds;
-
-            edit.Visible = true;
-            edit.Focus();
-
-            _editTextBox = edit;
+            node.BeginEdit(); // warning: this may cause indirect calls to EndEdit(), which shall be ignored
         }
-
-        private bool IsEditing => _editTextBox != null && _editTextBox.Visible && _editTextBox.XmlTreeNode != null;
 
         protected void EndEdit(bool acceptChanges = true)
         {
             if (!IsEditing)
                 return;
 
-            XmlTreeNode node = _editTextBox.XmlTreeNode;
-            _editTextBox.XmlTreeNode = null;
-
-            _editTextBox.Visible = false;
-            this.Focus(); // ensure focus goes to tree view (most of the time this happens automatically)
-            if (!acceptChanges || String.Equals(node.EditableValue, _editTextBox.Text, StringComparison.OrdinalIgnoreCase))
-            {
-                node.Text = node.ConstPrefix + node.EditableValue;
-            }
-            else
-            {
-#if false // fake it
-                node.EditableValue = _editTextBox.Text;
-                node.Text += node.EditableValue;
-#else // modify XML
-                XmlNode xmlNode = node.XmlNode;
-                if (xmlNode.NodeType == XmlNodeType.Comment)
-                {
-                    Match match = Regex.Match(xmlNode.Value ?? "", @"^(\s*).*?(\s*)$");
-                    Debug.Assert(match.Success);
-                    Debug.Assert(match.Groups.Count == 3);
-                    var value = match.Groups[1].Value + _editTextBox.Text + match.Groups[2].Value; // preverve spaces
-                    xmlNode.Value = value;
-                }
-                else if (xmlNode.NodeType == XmlNodeType.Element)
-                {
-                    if (xmlNode.ChildNodes.Count == 1 && xmlNode.ChildNodes[0].NodeType == XmlNodeType.Text)
-                    {
-                        xmlNode.ChildNodes[0].Value = _editTextBox.Text;
-                    }
-                    else
-                    {
-                        Debug.Assert(xmlNode.ChildNodes.Count == 0);
-                        xmlNode.InnerText = _editTextBox.Text;
-                    }
-                }
-#endif
-            }
+            XmlTreeNode node = _editBox.XmlTreeNode;
+            node.EndEdit(!acceptChanges);
         }
 
         protected void NextEdit(bool forward)
@@ -404,29 +550,15 @@ namespace XmlTreeViewWindowsFormsApplication
             if (!IsEditing)
                 return;
 
-            var node = _editTextBox.XmlTreeNode;
+            var node = _editBox.XmlTreeNode;
             EndEdit();
 
-            node = (XmlTreeNode)(forward ? node.NextNode : node.PrevNode ?? node.Parent);
+            node = (XmlTreeNode)(forward ? node.NextVisibleNode : node.PrevVisibleNode);
             if (node != null)
             {
                 this.SelectedNode = node;
                 node.EnsureVisible();
                 BeginEdit(node);
-            }
-        }
-
-        // WM_VSCROLL message constants
-        private const int WM_VSCROLL = 0x0115;
-        private const int SB_THUMBTRACK = 5;
-        private const int SB_ENDSCROLL = 8;
-        protected override void WndProc(ref Message m)
-        {
-            base.WndProc(ref m);
-
-            if (m.Msg == WM_VSCROLL)
-            {
-                this.EndEdit();
             }
         }
     }

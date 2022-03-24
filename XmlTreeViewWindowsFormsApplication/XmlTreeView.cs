@@ -15,6 +15,9 @@ using System.Xml.XPath;
 
 namespace XmlTreeViewWindowsFormsApplication
 {
+    [ToolboxItem(true)]
+    //[ToolboxItemFilter("System.Windows.Forms", ToolboxItemFilterType.Custom)]
+    [ToolboxBitmap(typeof(TreeView))]
     public partial class XmlTreeView : TreeView
     {
         protected class XmlTreeNode : TreeNode
@@ -190,19 +193,93 @@ namespace XmlTreeViewWindowsFormsApplication
                     BeginEdit((XmlTreeNode)this.SelectedNode);
                     e.Handled = IsEditing;
                     break;
+            }
+        }
 
-                // experimental!!!
-                case Keys.Delete:
-                    var node = (XmlTreeNode)this.SelectedNode;
-                    if (node != null)
-                    {
-                        node.XmlNode.ParentNode.RemoveChild(node.XmlNode);
-                        if (node.XmlNode.ChildNodes.Count > 0)
-                            node.XmlNode.RemoveChild(node.XmlNode.ChildNodes[0]);
-                    }
-                    e.Handled = IsEditing;
+        protected override void OnContextMenuStripChanged(EventArgs e)
+        {
+            base.OnContextMenuStripChanged(e);
+
+            if (this.ContextMenuStrip == null)
+                return;
+
+            this.ContextMenuStrip.Opening -= OnContextMenuStripOpening;
+            this.ContextMenuStrip.Opening += OnContextMenuStripOpening;
+
+            this.ContextMenuStrip.Closed -= OnContextMenuStripClosed;
+            this.ContextMenuStrip.Closed += OnContextMenuStripClosed;
+
+            this.ContextMenuStrip.ItemClicked -= OnContextMenuStripItemClicked;
+            this.ContextMenuStrip.ItemClicked += OnContextMenuStripItemClicked;
+        }
+
+        private void OnContextMenuStripOpening(object sender, CancelEventArgs e)
+        {
+            var cms = sender as ContextMenuStrip;
+            if (cms == null || cms.SourceControl != this)
+                return;
+
+            if (_contextMenuNode == null)
+                e.Cancel = true;
+        }
+
+        private void OnContextMenuStripClosed(object sender, ToolStripDropDownClosedEventArgs e)
+        {
+            var cms = sender as ContextMenuStrip;
+            if (cms == null || cms.SourceControl != this)
+                return;
+
+            _contextMenuNode = null;
+        }
+
+        // Method is also called if context menu item is selected by keyboard (cursor keys and return key).
+        // Method is also called if context menu item is activated by associated keyboard shortcut,
+        // but member SourceControl may be null in some situations.
+        private void OnContextMenuStripItemClicked(object sender, ToolStripItemClickedEventArgs e)
+        {
+            var cms = sender as ContextMenuStrip;
+            if (cms == null || cms.SourceControl != this && cms.SourceControl != null)
+                return;
+
+            if (cms.SourceControl == null && !this.Focused)
+            {
+                return; // Multiple XmlTreeView may share the same menu - only the one with keyboard focus shall react
+            }
+
+            if (_contextMenuNode == null)
+                _contextMenuNode = GetVisibleSelectedNode();
+
+            if (_contextMenuNode == null)
+                return;
+
+            switch (e.ClickedItem.Name)
+            {
+                case "deleteToolStripMenuItem":
+                    RemoveXmlNode(_contextMenuNode.XmlNode);
+                    break;
+
+                case "insertToolStripMenuItem":
+                    MessageBox.Show("insertToolStripMenuItem not implemented yet");
                     break;
             }
+
+            _contextMenuNode = null;
+        }
+
+        protected void RemoveXmlNode(XmlNode xmlNode)
+        {
+            xmlNode.ParentNode.RemoveChild(xmlNode);
+        }
+
+        protected XmlTreeNode GetVisibleSelectedNode()
+        {
+            var node = (XmlTreeNode)this.SelectedNode;
+            if (node == null)
+                return null;
+
+            Rectangle b = node.Bounds;
+            b.Intersect(this.ClientRectangle);
+            return b.IsEmpty ? null : node;
         }
 
         protected EditBox _editBox;
@@ -221,7 +298,7 @@ namespace XmlTreeViewWindowsFormsApplication
             _editBox = new EditBox(this);
         }
 
-        #region Activate double buffering to reduce flickering
+#region Activate double buffering to reduce flickering
         private const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
         private const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
         private const int TVS_EX_DOUBLEBUFFER = 0x0004;
@@ -233,18 +310,35 @@ namespace XmlTreeViewWindowsFormsApplication
             SendMessage(this.Handle, TVM_SETEXTENDEDSTYLE, (IntPtr)TVS_EX_DOUBLEBUFFER, (IntPtr)TVS_EX_DOUBLEBUFFER);
             base.OnHandleCreated(e);
         }
-        #endregion
+#endregion
 
-        #region Detect scrolling
+#region Detect scrolling and the node a context menu is opened on
         private const int WM_VSCROLL = 0x0115;
+        private const int WM_CONTEXTMENU = 0x007B;
+        protected XmlTreeNode _contextMenuNode;
         protected override void WndProc(ref Message m)
         {
-            base.WndProc(ref m);
-
             if (m.Msg == WM_VSCROLL)
             {
                 this.EndEdit();
             }
+            else if (m.Msg == WM_CONTEXTMENU)
+            {
+                // lParam == -1 is a special value if context menu is opened by Shift-F10 or Menu key.
+                if ((long)m.LParam == -1)
+                {
+                    this._contextMenuNode = GetVisibleSelectedNode();
+                }
+                else
+                {
+                    var p = this.PointToClient(new Point(
+                        unchecked((short)(long)m.LParam),
+                        unchecked((short)((long)m.LParam >> 16))));
+                    this._contextMenuNode = (XmlTreeNode)this.GetNodeAt(p);
+                }
+            }
+
+            base.WndProc(ref m);
         }
         #endregion
 
@@ -264,7 +358,7 @@ namespace XmlTreeViewWindowsFormsApplication
         [Description("Indicates whether the user can edit the XML.")]
         [DefaultValue(true)]
         public new bool LabelEdit { get; set; }
-        #endregion
+#endregion
 
         private void Init(XmlNode root)
         {
@@ -477,7 +571,7 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 
 
-        private bool _doubleClickWithoutLayoutChanges;
+        protected bool _doubleClickWithoutLayoutChanges;
 
         protected override void OnDoubleClick(EventArgs e)
         {
@@ -491,7 +585,10 @@ namespace XmlTreeViewWindowsFormsApplication
 
             var me = (MouseEventArgs)e;
 
-            BeginEdit((XmlTreeNode)this.GetNodeAt(me.Location));
+            if (me.Button == MouseButtons.Left)
+            {
+                BeginEdit((XmlTreeNode)this.GetNodeAt(me.Location));
+            }
         }
 
 #if false

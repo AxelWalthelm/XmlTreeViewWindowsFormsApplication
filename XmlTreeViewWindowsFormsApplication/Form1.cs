@@ -74,7 +74,14 @@ namespace XmlTreeViewWindowsFormsApplication
         {
             this.BeginInvoke(((MethodInvoker)(() => {
                 this.Text = "XmlTreeView - autosaving...";
-                XmlDocument.Save(FilePath);
+                try
+                {
+                    XmlDocument.Save(FilePath);
+                }
+                catch (Exception exception)
+                {
+                    MessageBox.Show(exception.ToString());
+                }
                 this.Text = $"XmlTreeView - autosaved {++AutoSaveCount} times";
             })));
         }

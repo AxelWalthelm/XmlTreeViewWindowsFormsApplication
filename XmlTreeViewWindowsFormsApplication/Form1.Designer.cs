@@ -28,11 +28,16 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.buttonLoad = new System.Windows.Forms.Button();
             this.buttonSave = new System.Windows.Forms.Button();
             this.buttonReset = new System.Windows.Forms.Button();
+            this.contextMenuStripXmlTreeView = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.insertToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.xmlTreeView2 = new XmlTreeViewWindowsFormsApplication.XmlTreeView();
             this.xmlTreeView1 = new XmlTreeViewWindowsFormsApplication.XmlTreeView();
+            this.contextMenuStripXmlTreeView.SuspendLayout();
             this.SuspendLayout();
             // 
             // buttonLoad
@@ -68,10 +73,33 @@
             this.buttonReset.UseVisualStyleBackColor = true;
             this.buttonReset.Click += new System.EventHandler(this.buttonReset_Click);
             // 
+            // contextMenuStripXmlTreeView
+            // 
+            this.contextMenuStripXmlTreeView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.insertToolStripMenuItem,
+            this.deleteToolStripMenuItem});
+            this.contextMenuStripXmlTreeView.Name = "contextMenuStripXmlTreeView";
+            this.contextMenuStripXmlTreeView.Size = new System.Drawing.Size(153, 70);
+            // 
+            // insertToolStripMenuItem
+            // 
+            this.insertToolStripMenuItem.Name = "insertToolStripMenuItem";
+            this.insertToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.Insert;
+            this.insertToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.insertToolStripMenuItem.Text = "Insert";
+            // 
+            // deleteToolStripMenuItem
+            // 
+            this.deleteToolStripMenuItem.Name = "deleteToolStripMenuItem";
+            this.deleteToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.Delete;
+            this.deleteToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
+            this.deleteToolStripMenuItem.Text = "Delete";
+            // 
             // xmlTreeView2
             // 
             this.xmlTreeView2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.xmlTreeView2.ContextMenuStrip = this.contextMenuStripXmlTreeView;
             this.xmlTreeView2.LabelEdit = false;
             this.xmlTreeView2.Location = new System.Drawing.Point(152, 13);
             this.xmlTreeView2.Name = "xmlTreeView2";
@@ -82,6 +110,7 @@
             // 
             this.xmlTreeView1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left)));
+            this.xmlTreeView1.ContextMenuStrip = this.contextMenuStripXmlTreeView;
             this.xmlTreeView1.LabelEdit = false;
             this.xmlTreeView1.Location = new System.Drawing.Point(13, 13);
             this.xmlTreeView1.Name = "xmlTreeView1";
@@ -102,6 +131,7 @@
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
             this.Text = "XmlTreeView";
             this.SizeChanged += new System.EventHandler(this.Form1_SizeChanged);
+            this.contextMenuStripXmlTreeView.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -113,6 +143,9 @@
         private System.Windows.Forms.Button buttonSave;
         private System.Windows.Forms.Button buttonReset;
         private XmlTreeView xmlTreeView2;
+        private System.Windows.Forms.ContextMenuStrip contextMenuStripXmlTreeView;
+        private System.Windows.Forms.ToolStripMenuItem insertToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem deleteToolStripMenuItem;
     }
 }
 

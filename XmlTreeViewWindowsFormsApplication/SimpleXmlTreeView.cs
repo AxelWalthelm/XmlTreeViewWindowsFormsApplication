@@ -42,11 +42,11 @@ namespace XmlTreeViewWindowsFormsApplication
                 if (XmlNode.NodeType == XmlNodeType.Element)
                 {
                     bool isLeaf = !XmlNode.ChildNodes.Cast<XmlNode>().Any(n => n.NodeType == XmlNodeType.Element);
-                    var textChilds = XmlNode.ChildNodes.Cast<XmlNode>().Where(n => n.NodeType == XmlNodeType.Text).ToList();
-                    if (textChilds.Count <= 1 && isLeaf)
+                    var textChildren = XmlNode.ChildNodes.Cast<XmlNode>().Where(n => n.NodeType == XmlNodeType.Text).ToList();
+                    if (textChildren.Count <= 1 && isLeaf)
                     {
                         ConstPrefix = XmlNode.Name + " = ";
-                        EditableValue = textChilds.FirstOrDefault()?.Value ?? "";
+                        EditableValue = textChildren.FirstOrDefault()?.Value ?? "";
                     }
                     else
                     {
@@ -259,7 +259,14 @@ namespace XmlTreeViewWindowsFormsApplication
                     break;
 
                 case "insertToolStripMenuItem":
-                    MessageBox.Show("insertToolStripMenuItem not implemented yet");
+                    XmlTreeNode contextMenuNode = _contextMenuNode;
+                    using (var form = new SimpleXmlTreeViewInsertDialog())
+                    {
+                        if (form.ShowDialog(this) == DialogResult.OK)
+                        {
+                            InsertNewXmlNode(contextMenuNode.XmlNode, form.Result);
+                        }
+                    }
                     break;
             }
 
@@ -269,6 +276,44 @@ namespace XmlTreeViewWindowsFormsApplication
         protected void RemoveXmlNode(XmlNode xmlNode)
         {
             xmlNode.ParentNode.RemoveChild(xmlNode);
+        }
+
+        private void InsertNewXmlNode(XmlNode xmlNode, SimpleXmlTreeViewInsertDialog.Results result)
+        {
+            XmlNode newNode = null;
+            if (result.Name == "" && result.Value == "" && result.Comment != "")
+            {
+                newNode = XmlDocument.CreateComment(result.Comment);
+            }
+            else
+            {
+                string name = XmlConvert.EncodeName(result.Name == "" ? "_" : result.Name);
+                newNode = XmlDocument.CreateElement(name);
+                if (result.Value != "")
+                {
+                    newNode.AppendChild(XmlDocument.CreateTextNode(result.Value));
+                }
+                if (result.Comment != "")
+                {
+                    newNode.AppendChild(XmlDocument.CreateComment(result.Comment));
+                }
+            }
+
+            if (result.InsertLocation == SimpleXmlTreeViewInsertDialog.Results.InsertLocations.Inside &&
+                xmlNode.NodeType != XmlNodeType.Comment) // can not insert in comments => insert after
+            {
+                xmlNode.PrependChild(newNode);
+            }
+            else if (result.InsertLocation == SimpleXmlTreeViewInsertDialog.Results.InsertLocations.Before)
+            {
+                xmlNode.ParentNode.InsertBefore(newNode, xmlNode);
+            }
+            else
+            {
+                xmlNode.ParentNode.InsertAfter(newNode, xmlNode);
+            }
+
+            _displayedNodes[newNode].ExpandAll();
         }
 
         protected XmlTreeNode GetVisibleSelectedNode()
@@ -367,6 +412,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
             this.BeginUpdate();
 
+            WriteConsole();
             Clear();
 
             var xmlDocument = GetXmlDocument(root);
@@ -440,7 +486,50 @@ namespace XmlTreeViewWindowsFormsApplication
             }
             else if (e.Action == XmlNodeChangedAction.Remove)
             {
-                RemoveNode(e.Node);
+                RemoveNode(e.Node, e.OldParent);
+            }
+        }
+
+        private void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
+        {
+            XmlTreeNode treeNode;
+            if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
+            {
+                treeNode.Remove();
+                _displayedNodes.Remove(xmlNode);
+            }
+
+            // some element types can influence how their parent is displayed => update parent text
+            UpdateParentText(xmlNode, xmlOldParentNode);
+        }
+
+        private void WriteConsole()
+        {
+            Console.WriteLine($"BEGIN {this.Name}");
+
+            WriteConsole(this.Nodes, "");
+
+            Console.WriteLine($"END {this.Name}");
+        }
+
+        private void WriteConsole(TreeNodeCollection nodes, string indent)
+        {
+            indent += "  ";
+            foreach (XmlTreeNode node in nodes)
+            {
+                Console.WriteLine($"{indent}{node.Text}");
+
+                WriteConsole(node.Nodes, indent);
+            }
+        }
+
+        private void UpdateTree(XmlNode xmlNode)
+        {
+            UpdateNode(xmlNode);
+
+            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
+            {
+                UpdateTree(xmlChildNode);
             }
         }
 
@@ -463,21 +552,19 @@ namespace XmlTreeViewWindowsFormsApplication
             }
 
             // some element types can influence how their parent is displayed => update parent text
-            if (xmlNode.NodeType == XmlNodeType.Text || xmlNode.NodeType == XmlNodeType.Element)
-            {
-                XmlTreeNode parentTreeNode;
-                if (xmlNode.ParentNode != null && _displayedNodes.TryGetValue(xmlNode.ParentNode, out parentTreeNode))
-                    parentTreeNode.UpdateText();
-            }
+            UpdateParentText(xmlNode);
         }
 
-        private void UpdateTree(XmlNode xmlNode)
+        private void UpdateParentText(XmlNode xmlNode, XmlNode xmlParentNode = null)
         {
-            UpdateNode(xmlNode);
-
-            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
+            if (xmlNode.NodeType == XmlNodeType.Text || xmlNode.NodeType == XmlNodeType.Element)
             {
-                UpdateTree(xmlChildNode);
+                if (xmlParentNode == null)
+                    xmlParentNode = xmlNode.ParentNode;
+
+                XmlTreeNode parentTreeNode;
+                if (xmlParentNode != null && _displayedNodes.TryGetValue(xmlParentNode, out parentTreeNode))
+                    parentTreeNode.UpdateText();
             }
         }
 
@@ -508,43 +595,55 @@ namespace XmlTreeViewWindowsFormsApplication
             return treeNode;
         }
 
-        private void UpdateChildren(XmlNode xmlNode, TreeNodeCollection treeNodes)
+        private void UpdateChildren(XmlNode xmlNode, TreeNodeCollection treeChildren)
         {
-            if (xmlNode == null || treeNodes == null)
+            if (xmlNode == null || treeChildren == null)
                 return;
 
-            var treeChilds = new List<XmlTreeNode>();
+            var newChildren = new List<TreeNode>();
             foreach (XmlNode xmlChild in xmlNode.ChildNodes.Cast<XmlNode>())
             {
                 XmlTreeNode treeChild;
                 if (_displayedNodes.TryGetValue(xmlChild, out treeChild))
                 {
-                    treeChilds.Add(treeChild);
+                    newChildren.Add(treeChild);
                 }
             }
 
-            treeNodes.Clear();
-            treeNodes.AddRange(treeChilds.Cast<TreeNode>().ToArray());
-        }
-
-        private void RemoveNode(XmlNode xmlNode)
-        {
-            XmlTreeNode treeNode;
-            if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
+#if false
+            // simple, but causes flickering
+            treeChildren.Clear();
+            treeChildren.AddRange(newChildren.ToArray());
+#else
+            // modify only what has changed to avoid flickering
+            for (int index = 0; index < newChildren.Count; index++)
             {
-                treeNode.Remove();
-                _displayedNodes.Remove(xmlNode);
-            }
-        }
+                if (index >= treeChildren.Count)
+                {
+                    treeChildren.AddRange(newChildren.Skip(index).ToArray());
+                    break;
+                }
 
-        private void RemoveTree(XmlNode xmlNode)
-        {
-            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
-            {
-                RemoveTree(xmlChildNode);
-            }
+                var newChild = newChildren[index];
+                var treeChild = treeChildren[index];
+                if (newChild == treeChild)
+                {
+                    continue;
+                }
 
-            RemoveNode(xmlNode);
+                // removed nodes are already removed from treeChildren automatically;
+                // child nodes are unique (no child appears twice in the list of children);
+                // newChildren and treeChildren are the same for i < index;
+                // => treeChild must be in newChildren at higher position than index
+                Debug.Assert(newChildren.IndexOf(treeChild) > index);
+
+                // a move consists of a remove and an add;
+                // removed nodes are already removed from treeChildren automatically;
+                // => we only have to consider add, newChild can not be in treeChildren
+                Debug.Assert(treeChildren.IndexOf(newChild) < 0);
+                treeChildren.Insert(index, newChild);
+            }
+#endif
         }
 
         protected override void OnSizeChanged(EventArgs e)

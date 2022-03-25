@@ -25,6 +25,9 @@ namespace XmlTreeViewWindowsFormsApplication
             AutoSave.OnAutoSave += OnAutoSave;
 
             XmlDocument = new XmlDocument();
+#if false
+            LoadDummyXmlDocument();
+#else
             try
             {
                 XmlDocument.Load(FilePath);
@@ -35,13 +38,16 @@ namespace XmlTreeViewWindowsFormsApplication
 
                 LoadDummyXmlDocument();
             }
+#endif
             AutoSave.XmlDocument = XmlDocument;
 
             this.xmlTreeView1.Root = XmlDocument.ChildNodes.Cast<XmlNode>().FirstOrDefault(n => n.NodeType == XmlNodeType.Element);
             this.xmlTreeView1.ExpandAll();
+            this.xmlTreeView1.WriteConsole();
 
             this.xmlTreeView2.Root = XmlDocument;
             this.xmlTreeView2.ExpandAll();
+            this.xmlTreeView2.WriteConsole();
         }
 
         private void LoadDummyXmlDocument()

@@ -412,7 +412,6 @@ namespace XmlTreeViewWindowsFormsApplication
 
             this.BeginUpdate();
 
-            WriteConsole();
             Clear();
 
             var xmlDocument = GetXmlDocument(root);
@@ -503,7 +502,7 @@ namespace XmlTreeViewWindowsFormsApplication
             UpdateParentText(xmlNode, xmlOldParentNode);
         }
 
-        private void WriteConsole()
+        public void WriteConsole()
         {
             Console.WriteLine($"BEGIN {this.Name}");
 
@@ -525,18 +524,18 @@ namespace XmlTreeViewWindowsFormsApplication
 
         private void UpdateTree(XmlNode xmlNode)
         {
-            UpdateNode(xmlNode);
-
             foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
             {
                 UpdateTree(xmlChildNode);
             }
+
+            UpdateNode(xmlNode);
         }
 
         private void UpdateNode(XmlNode xmlNode)
         {
             XmlTreeNode treeNode;
-            if (!_displayedNodes.TryGetValue(xmlNode, out treeNode))
+            if (!_displayedNodes.TryGetValue(xmlNode, out treeNode) && xmlNode != _rootXmlNode)
             {
                 if (xmlNode.NodeType == XmlNodeType.Element || xmlNode.NodeType == XmlNodeType.Comment)
                 {

@@ -25,7 +25,7 @@ namespace XmlTreeViewWindowsFormsApplication
         private static void ShowConsole()
         {
             AllocConsole();
-            Console.WriteLine("ShowConsole");
+            Console.WriteLine("XmlTreeViewWindowsFormsApplication.ShowConsole");
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]

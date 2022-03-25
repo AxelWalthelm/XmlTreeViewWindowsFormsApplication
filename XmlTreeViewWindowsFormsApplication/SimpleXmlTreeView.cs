@@ -26,7 +26,7 @@ namespace XmlTreeViewWindowsFormsApplication
             private string ConstPrefix;
             private string EditableValue;
 
-            public new SimpleXmlTreeView TreeView => (SimpleXmlTreeView)base.TreeView;
+            public new SimpleXmlTreeView TreeView => (SimpleXmlTreeView)base.TreeView; // null if not inserted (yet) into a TreeView
             public EditBox EditBox => TreeView._editBox;
 
             public bool IsEditable => EditableValue != null;
@@ -37,7 +37,7 @@ namespace XmlTreeViewWindowsFormsApplication
                 XmlNode = xmlNode;
             }
 
-            public void UpdateText()
+            public void UpdateText(SimpleXmlTreeView treeView)
             {
                 if (XmlNode.NodeType == XmlNodeType.Element)
                 {
@@ -53,12 +53,13 @@ namespace XmlTreeViewWindowsFormsApplication
                         ConstPrefix = XmlNode.Name;
                         EditableValue = null;
                     }
+                    this.ForeColor = new Color(); // use default
                 }
                 else if (XmlNode.NodeType == XmlNodeType.Comment)
                 {
                     ConstPrefix = "# ";
                     EditableValue = XmlNode.Value.Trim();
-                    this.ForeColor = Color.DarkGreen;
+                    this.ForeColor = treeView.CommentColor;
                 }
 
                 SetText(true);
@@ -344,12 +345,6 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 
 #region Activate double buffering to reduce flickering
-        private const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
-        private const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
-        private const int TVS_EX_DOUBLEBUFFER = 0x0004;
-        [DllImport("user32.dll")]
-        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wp, IntPtr lp);
-
         protected override void OnHandleCreated(EventArgs e)
         {
             SendMessage(this.Handle, TVM_SETEXTENDEDSTYLE, (IntPtr)TVS_EX_DOUBLEBUFFER, (IntPtr)TVS_EX_DOUBLEBUFFER);
@@ -385,9 +380,9 @@ namespace XmlTreeViewWindowsFormsApplication
 
             base.WndProc(ref m);
         }
-        #endregion
+#endregion
 
-        #region Designer
+#region Designer
         [Browsable(false)]
         [Category("Data")]
         [Description("The XML tree or sub-tree to be displayed.")]
@@ -403,6 +398,17 @@ namespace XmlTreeViewWindowsFormsApplication
         [Description("Indicates whether the user can edit the XML.")]
         [DefaultValue(true)]
         public new bool LabelEdit { get; set; }
+
+        private Color _commentColor = Color.DarkGreen;
+
+        [Browsable(true)]
+        [Category("Appearance")]
+        [Description("Color of XML comments.")]
+        [DefaultValue(typeof(Color), "DarkGreen")]
+        public Color CommentColor {
+            get { return _commentColor; }
+            set { if (_commentColor != value) { _commentColor = value; UpdateTree(); } }
+        }
 #endregion
 
         private void Init(XmlNode root)
@@ -419,7 +425,7 @@ namespace XmlTreeViewWindowsFormsApplication
             {
                 _rootXmlNode = root;
                 _xmlDocument = xmlDocument;
-                UpdateTree(_rootXmlNode);
+                UpdateTree();
                 RegisterEvents();
             }
 
@@ -522,6 +528,14 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
+        private void UpdateTree()
+        {
+            if (_xmlDocument != null && _rootXmlNode != null)
+            {
+                UpdateTree(_rootXmlNode);
+            }
+        }
+
         private void UpdateTree(XmlNode xmlNode)
         {
             foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
@@ -547,7 +561,7 @@ namespace XmlTreeViewWindowsFormsApplication
             if (treeNode != null)
             {
                 UpdateLinks(treeNode);
-                treeNode.UpdateText();
+                treeNode.UpdateText(this);
             }
 
             // some element types can influence how their parent is displayed => update parent text
@@ -563,7 +577,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
                 XmlTreeNode parentTreeNode;
                 if (xmlParentNode != null && _displayedNodes.TryGetValue(xmlParentNode, out parentTreeNode))
-                    parentTreeNode.UpdateText();
+                    parentTreeNode.UpdateText(this);
             }
         }
 
@@ -689,32 +703,6 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-#if false
-        protected SizeF MeasureText(string text)
-        {
-#if true
-            using (Graphics g = Graphics.FromHwnd(this.Handle))
-            {
-                return g.MeasureString(text, Font);
-            }
-#else
-            TextFormatFlags treeFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoClipping | TextFormatFlags.NoPadding;
-            return TextRenderer.MeasureText(node.ConstPrefix, this.Font, bounds.Size, treeFlags);
-#endif
-        }
-#endif
-
-
-
-        [DllImport("user32.dll")]
-        private static extern int GetSystemMetrics(int nIndex);
-
-        private const int SM_CXEDGE = 45;
-        private const int SM_CYEDGE = 46;
-
-        private const int SM_CXBORDER = 5;
-        private const int SM_CYBORDER = 6;
-
         protected void BeginEdit(XmlTreeNode node)
         {
             if (base.LabelEdit)
@@ -756,5 +744,54 @@ namespace XmlTreeViewWindowsFormsApplication
                 BeginEdit(node);
             }
         }
+
+        protected override void OnForeColorChanged(EventArgs e)
+        {
+            base.OnForeColorChanged(e);
+
+            InvalidateBorder();
+        }
+
+        protected override void OnBackColorChanged(EventArgs e)
+        {
+            base.OnBackColorChanged(e);
+
+            InvalidateBorder();
+        }
+
+        protected void InvalidateBorder()
+        {
+            RedrawWindow(this.Handle, IntPtr.Zero, IntPtr.Zero, RDW_FRAME | RDW_INVALIDATE);
+        }
+
+#region P/Invoke
+        private const int SM_CXEDGE = 45;
+        private const int SM_CYEDGE = 46;
+        private const int SM_CXBORDER = 5;
+        private const int SM_CYBORDER = 6;
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        private const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
+        private const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
+        private const int TVS_EX_DOUBLEBUFFER = 0x0004;
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wp, IntPtr lp);
+
+        private const uint RDW_INVALIDATE = 0x0001;
+        private const uint RDW_INTERNALPAINT = 0x0002;
+        private const uint RDW_ERASE = 0x0004;
+        private const uint RDW_VALIDATE = 0x0008;
+        private const uint RDW_NOINTERNALPAINT = 0x0010;
+        private const uint RDW_NOERASE = 0x0020;
+        private const uint RDW_NOCHILDREN = 0x0040;
+        private const uint RDW_ALLCHILDREN = 0x0080;
+        private const uint RDW_UPDATENOW = 0x0100;
+        private const uint RDW_ERASENOW = 0x0200;
+        private const uint RDW_FRAME = 0x0400;
+        private const uint RDW_NOFRAME = 0x0800;
+        [DllImport("user32.dll")]
+        private static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
+#endregion
     }
 }

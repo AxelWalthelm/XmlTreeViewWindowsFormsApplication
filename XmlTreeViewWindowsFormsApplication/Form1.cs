@@ -89,11 +89,23 @@ namespace XmlTreeViewWindowsFormsApplication
                 MessageBox.Show(exception.ToString());
             }
             this.Text = $"SimpleXmlTreeView - autosaved {++AutoSaveCount} times";
+
+            if (this.xmlTreeView2.CommentColor != SystemColors.Highlight)
+            {
+                this.xmlTreeView2.CommentColor = SystemColors.Highlight;
+                this.xmlTreeView2.ForeColor = SystemColors.GrayText;
+                this.xmlTreeView2.BackColor = SystemColors.WindowText;
+            }
+            else
+            {
+                this.xmlTreeView2.CommentColor = Color.Orange;
+                this.xmlTreeView2.ForeColor = this.xmlTreeView1.ForeColor;
+                this.xmlTreeView2.BackColor = this.xmlTreeView1.BackColor;
+            }
         }
 
         private void buttonLoad_Click(object sender, EventArgs e)
         {
-
             this.xmlTreeView1.BeginUpdate();
             this.xmlTreeView2.BeginUpdate();
             AutoSave.XmlDocument = null;

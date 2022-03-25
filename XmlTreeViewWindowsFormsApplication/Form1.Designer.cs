@@ -99,7 +99,10 @@
             // 
             this.xmlTreeView2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.xmlTreeView2.BackColor = System.Drawing.SystemColors.WindowText;
+            this.xmlTreeView2.CommentColor = System.Drawing.SystemColors.Highlight;
             this.xmlTreeView2.ContextMenuStrip = this.contextMenuStripXmlTreeView;
+            this.xmlTreeView2.ForeColor = System.Drawing.SystemColors.GrayText;
             this.xmlTreeView2.LabelEdit = false;
             this.xmlTreeView2.Location = new System.Drawing.Point(255, 13);
             this.xmlTreeView2.Name = "xmlTreeView2";

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -20,8 +21,7 @@ namespace XmlTreeViewWindowsFormsApplication
         public Form1()
         {
             InitializeComponent();
-            AutoSave = new XmlAutoSave { DelayInterval = 3000 };
-            //this.components.Add(AutoSave);
+            AutoSave = new XmlAutoSave(this.components) { Interval = 3000 };
             AutoSave.OnAutoSave += OnAutoSave;
 
             XmlDocument = new XmlDocument();
@@ -72,18 +72,17 @@ namespace XmlTreeViewWindowsFormsApplication
 
         private void OnAutoSave(object sender, EventArgs e)
         {
-            this.BeginInvoke(((MethodInvoker)(() => {
-                this.Text = "XmlTreeView - autosaving...";
-                try
-                {
-                    XmlDocument.Save(FilePath);
-                }
-                catch (Exception exception)
-                {
-                    MessageBox.Show(exception.ToString());
-                }
-                this.Text = $"XmlTreeView - autosaved {++AutoSaveCount} times";
-            })));
+            Debug.Assert(sender == XmlDocument);
+            this.Text = "XmlTreeView - autosaving...";
+            try
+            {
+                XmlDocument.Save(FilePath);
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(exception.ToString());
+            }
+            this.Text = $"XmlTreeView - autosaved {++AutoSaveCount} times";
         }
 
         private void buttonLoad_Click(object sender, EventArgs e)

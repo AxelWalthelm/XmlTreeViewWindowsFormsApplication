@@ -1,21 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Timers;
+using System.Windows.Forms;
 using System.Xml;
 
 namespace XmlTreeViewWindowsFormsApplication
 {
+    [ToolboxItem(true)]
+    //[ToolboxItemFilter("System.Windows.Forms", ToolboxItemFilterType.Custom)]
+    [ToolboxBitmap(typeof(Timer))]
     public sealed class XmlAutoSave : Component
     {
-        private readonly Timer _timer = new Timer{ AutoReset = false, Interval = 50 };
-
+        private readonly Timer _timer = new Timer();
         public EventHandler OnAutoSave;
 
-        public double DelayInterval
+        public int Interval
         {
             get { return _timer.Interval; }
             set { _timer.Interval = value; }
@@ -23,7 +26,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
         public XmlAutoSave()
         {
-            _timer.Elapsed += (object sender, ElapsedEventArgs e) => OnAutoSave?.Invoke(_xmlDocument, new EventArgs());
+            _timer.Tick += OnTick;
         }
 
         public XmlAutoSave(IContainer container) : this()
@@ -31,10 +34,20 @@ namespace XmlTreeViewWindowsFormsApplication
             container.Add(this);
         }
 
+        private void OnTick(object sender, EventArgs e)
+        {
+            _timer.Enabled = false;
+            OnAutoSave?.Invoke(_xmlDocument, e);
+        }
+
         protected override void Dispose(bool disposing)
         {
-            _timer.Dispose();
-            UnregisterEvents();
+            if (disposing)
+            {
+                _timer.Dispose();
+                UnregisterEvents();
+            }
+
             base.Dispose(disposing);
         }
 

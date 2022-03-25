@@ -1,6 +1,6 @@
 ﻿namespace XmlTreeViewWindowsFormsApplication
 {
-    partial class XmlTreeView
+    partial class SimpleXmlTreeView
     {
         /// <summary>
         /// Required designer variable.

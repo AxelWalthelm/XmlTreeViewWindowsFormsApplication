@@ -57,11 +57,11 @@
     <Compile Include="XmlAutoSave.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="XmlTreeView.cs">
+    <Compile Include="SimpleXmlTreeView.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="XmlTreeView.Designer.cs">
-      <DependentUpon>XmlTreeView.cs</DependentUpon>
+    <Compile Include="SimpleXmlTreeView.Designer.cs">
+      <DependentUpon>SimpleXmlTreeView.cs</DependentUpon>
     </Compile>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>

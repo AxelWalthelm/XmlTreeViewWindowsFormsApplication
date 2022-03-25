@@ -18,7 +18,7 @@ namespace XmlTreeViewWindowsFormsApplication
     [ToolboxItem(true)]
     //[ToolboxItemFilter("System.Windows.Forms", ToolboxItemFilterType.Custom)]
     [ToolboxBitmap(typeof(TreeView))]
-    public partial class XmlTreeView : TreeView
+    public partial class SimpleXmlTreeView : TreeView
     {
         protected class XmlTreeNode : TreeNode
         {
@@ -26,7 +26,7 @@ namespace XmlTreeViewWindowsFormsApplication
             private string ConstPrefix;
             private string EditableValue;
 
-            public new XmlTreeView TreeView => (XmlTreeView)base.TreeView;
+            public new SimpleXmlTreeView TreeView => (SimpleXmlTreeView)base.TreeView;
             public EditBox EditBox => TreeView._editBox;
 
             public bool IsEditable => EditableValue != null;
@@ -139,12 +139,12 @@ namespace XmlTreeViewWindowsFormsApplication
 
         protected class EditBox : TextBox
         {
-            public readonly XmlTreeView Host;
+            public readonly SimpleXmlTreeView Host;
             public XmlTreeNode XmlTreeNode;
 
             public bool IsEditing => XmlTreeNode != null && Visible;
 
-            public EditBox(XmlTreeView host)
+            public EditBox(SimpleXmlTreeView host)
             {
                 Host = host;
                 this.Visible = false;
@@ -243,7 +243,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
             if (cms.SourceControl == null && !this.Focused)
             {
-                return; // Multiple XmlTreeView may share the same menu - only the one with keyboard focus shall react
+                return; // Multiple SimpleXmlTreeView may share the same menu - only the one with keyboard focus shall react
             }
 
             if (_contextMenuNode == null)
@@ -291,7 +291,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
         protected readonly Dictionary<XmlNode, XmlTreeNode> _displayedNodes = new Dictionary<XmlNode, XmlTreeNode>();
 
-        public XmlTreeView()
+        public SimpleXmlTreeView()
         {
             InitializeComponent();
             //base.LabelEdit = true;

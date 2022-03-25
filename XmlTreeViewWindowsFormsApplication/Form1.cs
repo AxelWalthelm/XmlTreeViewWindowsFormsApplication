@@ -73,7 +73,7 @@ namespace XmlTreeViewWindowsFormsApplication
         private void OnAutoSave(object sender, EventArgs e)
         {
             Debug.Assert(sender == XmlDocument);
-            this.Text = "XmlTreeView - autosaving...";
+            this.Text = "SimpleXmlTreeView - autosaving...";
             try
             {
                 XmlDocument.Save(FilePath);
@@ -82,7 +82,7 @@ namespace XmlTreeViewWindowsFormsApplication
             {
                 MessageBox.Show(exception.ToString());
             }
-            this.Text = $"XmlTreeView - autosaved {++AutoSaveCount} times";
+            this.Text = $"SimpleXmlTreeView - autosaved {++AutoSaveCount} times";
         }
 
         private void buttonLoad_Click(object sender, EventArgs e)

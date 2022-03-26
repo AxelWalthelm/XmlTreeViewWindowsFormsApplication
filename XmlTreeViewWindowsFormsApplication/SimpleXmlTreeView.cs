@@ -274,9 +274,30 @@ namespace XmlTreeViewWindowsFormsApplication
             _contextMenuNode = null;
         }
 
+        protected IEnumerable<XmlTreeNode> EnumerateAllNodes(TreeNodeCollection nodes)
+        {
+            foreach (XmlTreeNode node in nodes)
+            {
+                yield return node;
+
+                EnumerateAllNodes(node.Nodes);
+            }
+        }
+
+        protected IEnumerable<XmlTreeNode> AllNodes => EnumerateAllNodes(this.Nodes);
+
         protected void RemoveXmlNode(XmlNode xmlNode)
         {
-            xmlNode.ParentNode.RemoveChild(xmlNode);
+            int nrNodes = 1 + EnumerateAllNodes(_displayedNodes[xmlNode].Nodes).Count();
+            var dialogResult = MessageBox.Show($"Remove {nrNodes} item(s) without undo?", "Delete", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+            if (dialogResult == DialogResult.OK)
+            {
+                xmlNode.ParentNode.RemoveChild(xmlNode);
+            }
+            else
+            {
+                this.SelectedNode = _displayedNodes[xmlNode];
+            }
         }
 
         private void InsertNewXmlNode(XmlNode xmlNode, SimpleXmlTreeViewInsertDialog.Results result)
@@ -304,6 +325,7 @@ namespace XmlTreeViewWindowsFormsApplication
                 xmlNode.NodeType != XmlNodeType.Comment) // can not insert in comments => insert after
             {
                 xmlNode.PrependChild(newNode);
+                _displayedNodes[xmlNode].ExpandAll();
             }
             else if (result.InsertLocation == SimpleXmlTreeViewInsertDialog.Results.InsertLocations.Before)
             {
@@ -315,6 +337,7 @@ namespace XmlTreeViewWindowsFormsApplication
             }
 
             _displayedNodes[newNode].ExpandAll();
+            this.SelectedNode = _displayedNodes[newNode];
         }
 
         protected XmlTreeNode GetVisibleSelectedNode()

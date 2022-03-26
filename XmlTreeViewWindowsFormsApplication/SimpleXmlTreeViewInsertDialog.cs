@@ -12,9 +12,20 @@ namespace XmlTreeViewWindowsFormsApplication
 {
     public partial class SimpleXmlTreeViewInsertDialog : Form
     {
+        protected static string InsertDefault = "radioButtonInsertAfter";
+        private IEnumerable<RadioButton> InsertButtons => this.groupBoxInsertWhere.Controls.OfType<RadioButton>();
+
         public SimpleXmlTreeViewInsertDialog()
         {
             InitializeComponent();
+
+            foreach (RadioButton button in InsertButtons)
+                button.Checked = button.Name == InsertDefault;
+        }
+
+        private void SimpleXmlTreeViewInsertDialog_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            InsertDefault = InsertButtons.Single(b => b.Checked).Name;
         }
 
         public class Results

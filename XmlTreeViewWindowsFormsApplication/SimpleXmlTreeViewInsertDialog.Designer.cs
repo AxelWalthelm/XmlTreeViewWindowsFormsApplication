@@ -90,12 +90,10 @@
             // 
             // radioButtonInsertAfter
             // 
-            this.radioButtonInsertAfter.Checked = true;
             this.radioButtonInsertAfter.Location = new System.Drawing.Point(12, 45);
             this.radioButtonInsertAfter.Name = "radioButtonInsertAfter";
             this.radioButtonInsertAfter.Size = new System.Drawing.Size(74, 24);
             this.radioButtonInsertAfter.TabIndex = 8;
-            this.radioButtonInsertAfter.TabStop = true;
             this.radioButtonInsertAfter.Text = "after";
             this.radioButtonInsertAfter.UseVisualStyleBackColor = true;
             // 
@@ -173,6 +171,7 @@
             this.Name = "SimpleXmlTreeViewInsertDialog";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
             this.Text = "Insert New Items";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SimpleXmlTreeViewInsertDialog_FormClosing);
             this.groupBoxInsertWhere.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();

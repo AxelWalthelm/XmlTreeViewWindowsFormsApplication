@@ -35,8 +35,8 @@
             this.contextMenuStripXmlTreeView = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.insertToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.xmlTreeView2 = new XmlTreeViewWindowsFormsApplication.SimpleXmlTreeView();
-            this.xmlTreeView1 = new XmlTreeViewWindowsFormsApplication.SimpleXmlTreeView();
+            this.xmlTreeView2 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
+            this.xmlTreeView1 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
             this.contextMenuStripXmlTreeView.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -141,11 +141,11 @@
 
         #endregion
 
-        private SimpleXmlTreeView xmlTreeView1;
+        private XmlTreeViewSimple xmlTreeView1;
         private System.Windows.Forms.Button buttonLoad;
         private System.Windows.Forms.Button buttonSave;
         private System.Windows.Forms.Button buttonReset;
-        private SimpleXmlTreeView xmlTreeView2;
+        private XmlTreeViewSimple xmlTreeView2;
         private System.Windows.Forms.ContextMenuStrip contextMenuStripXmlTreeView;
         private System.Windows.Forms.ToolStripMenuItem insertToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem deleteToolStripMenuItem;

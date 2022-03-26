@@ -12,32 +12,31 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.XPath;
+using static XmlTreeViewWindowsFormsApplication.XmlTreeViewWin32;
 
 namespace XmlTreeViewWindowsFormsApplication
 {
     [ToolboxItem(true)]
     //[ToolboxItemFilter("System.Windows.Forms", ToolboxItemFilterType.Custom)]
     [ToolboxBitmap(typeof(TreeView))]
-    public partial class SimpleXmlTreeView : TreeView
+    public partial class XmlTreeViewSimple : XmlTreeViewBase<XmlTreeViewSimple.XmlTreeNode>
     {
-        protected class XmlTreeNode : TreeNode
+        public class XmlTreeNode : XmlTreeNodeBase
         {
-            public readonly XmlNode XmlNode;
-            private string ConstPrefix;
-            private string EditableValue;
+            protected string ConstPrefix;
+            protected string EditableValue;
 
-            public new SimpleXmlTreeView TreeView => (SimpleXmlTreeView)base.TreeView; // null if not inserted (yet) into a TreeView
-            public EditBox EditBox => TreeView._editBox;
+            public new XmlTreeViewSimple TreeView => (XmlTreeViewSimple)base.TreeView; // null if not inserted (yet) into a TreeView
+            protected EditBox EditBox => TreeView._editBox;
 
             public bool IsEditable => EditableValue != null;
             public new bool IsEditing => TreeView.IsEditing;
 
-            public XmlTreeNode(XmlNode xmlNode)
+            public XmlTreeNode(XmlNode xmlNode) : base(xmlNode)
             {
-                XmlNode = xmlNode;
             }
 
-            public void UpdateText(SimpleXmlTreeView treeView)
+            public void UpdateText(XmlTreeViewSimple treeView)
             {
                 if (XmlNode.NodeType == XmlNodeType.Element)
                 {
@@ -138,14 +137,14 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        protected class EditBox : TextBox
+        public class EditBox : TextBox
         {
-            public readonly SimpleXmlTreeView Host;
+            public readonly XmlTreeViewSimple Host;
             public XmlTreeNode XmlTreeNode;
 
             public bool IsEditing => XmlTreeNode != null && Visible;
 
-            public EditBox(SimpleXmlTreeView host)
+            public EditBox(XmlTreeViewSimple host)
             {
                 Host = host;
                 this.Visible = false;
@@ -197,70 +196,15 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        protected override void OnContextMenuStripChanged(EventArgs e)
+        protected override void OnContextMenuAction(XmlTreeNode contextMenuNode, ToolStripItemClickedEventArgs e)
         {
-            base.OnContextMenuStripChanged(e);
-
-            if (this.ContextMenuStrip == null)
-                return;
-
-            this.ContextMenuStrip.Opening -= OnContextMenuStripOpening;
-            this.ContextMenuStrip.Opening += OnContextMenuStripOpening;
-
-            this.ContextMenuStrip.Closed -= OnContextMenuStripClosed;
-            this.ContextMenuStrip.Closed += OnContextMenuStripClosed;
-
-            this.ContextMenuStrip.ItemClicked -= OnContextMenuStripItemClicked;
-            this.ContextMenuStrip.ItemClicked += OnContextMenuStripItemClicked;
-        }
-
-        private void OnContextMenuStripOpening(object sender, CancelEventArgs e)
-        {
-            var cms = sender as ContextMenuStrip;
-            if (cms == null || cms.SourceControl != this)
-                return;
-
-            if (_contextMenuNode == null)
-                e.Cancel = true;
-        }
-
-        private void OnContextMenuStripClosed(object sender, ToolStripDropDownClosedEventArgs e)
-        {
-            var cms = sender as ContextMenuStrip;
-            if (cms == null || cms.SourceControl != this)
-                return;
-
-            _contextMenuNode = null;
-        }
-
-        // Method is also called if context menu item is selected by keyboard (cursor keys and return key).
-        // Method is also called if context menu item is activated by associated keyboard shortcut,
-        // but member SourceControl may be null in some situations.
-        private void OnContextMenuStripItemClicked(object sender, ToolStripItemClickedEventArgs e)
-        {
-            var cms = sender as ContextMenuStrip;
-            if (cms == null || cms.SourceControl != this && cms.SourceControl != null)
-                return;
-
-            if (cms.SourceControl == null && !this.Focused)
-            {
-                return; // Multiple SimpleXmlTreeView may share the same menu - only the one with keyboard focus shall react
-            }
-
-            if (_contextMenuNode == null)
-                _contextMenuNode = GetVisibleSelectedNode();
-
-            if (_contextMenuNode == null)
-                return;
-
             switch (e.ClickedItem.Name)
             {
                 case "deleteToolStripMenuItem":
-                    RemoveXmlNode(_contextMenuNode.XmlNode);
+                    RemoveXmlNode(contextMenuNode.XmlNode);
                     break;
 
                 case "insertToolStripMenuItem":
-                    XmlTreeNode contextMenuNode = _contextMenuNode;
                     using (var form = new SimpleXmlTreeViewInsertDialog())
                     {
                         if (form.ShowDialog(this) == DialogResult.OK)
@@ -270,21 +214,7 @@ namespace XmlTreeViewWindowsFormsApplication
                     }
                     break;
             }
-
-            _contextMenuNode = null;
         }
-
-        protected IEnumerable<XmlTreeNode> EnumerateAllNodes(TreeNodeCollection nodes)
-        {
-            foreach (XmlTreeNode node in nodes)
-            {
-                yield return node;
-
-                EnumerateAllNodes(node.Nodes);
-            }
-        }
-
-        protected IEnumerable<XmlTreeNode> AllNodes => EnumerateAllNodes(this.Nodes);
 
         protected void RemoveXmlNode(XmlNode xmlNode)
         {
@@ -340,82 +270,17 @@ namespace XmlTreeViewWindowsFormsApplication
             this.SelectedNode = _displayedNodes[newNode];
         }
 
-        protected XmlTreeNode GetVisibleSelectedNode()
-        {
-            var node = (XmlTreeNode)this.SelectedNode;
-            if (node == null)
-                return null;
-
-            Rectangle b = node.Bounds;
-            b.Intersect(this.ClientRectangle);
-            return b.IsEmpty ? null : node;
-        }
-
         protected EditBox _editBox;
         protected bool IsEditing => _editBox != null && _editBox.IsEditing;
 
-        protected XmlNode _rootXmlNode;
-        protected XmlDocument _xmlDocument;
-        public XmlDocument XmlDocument => _xmlDocument;
-
-        protected readonly Dictionary<XmlNode, XmlTreeNode> _displayedNodes = new Dictionary<XmlNode, XmlTreeNode>();
-
-        public SimpleXmlTreeView()
+        public XmlTreeViewSimple()
         {
             InitializeComponent();
             //base.LabelEdit = true;
             _editBox = new EditBox(this);
         }
 
-#region Activate double buffering to reduce flickering
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            SendMessage(this.Handle, TVM_SETEXTENDEDSTYLE, (IntPtr)TVS_EX_DOUBLEBUFFER, (IntPtr)TVS_EX_DOUBLEBUFFER);
-            base.OnHandleCreated(e);
-        }
-#endregion
-
-#region Detect scrolling and the node a context menu is opened on
-        private const int WM_VSCROLL = 0x0115;
-        private const int WM_CONTEXTMENU = 0x007B;
-        protected XmlTreeNode _contextMenuNode;
-        protected override void WndProc(ref Message m)
-        {
-            if (m.Msg == WM_VSCROLL)
-            {
-                this.EndEdit();
-            }
-            else if (m.Msg == WM_CONTEXTMENU)
-            {
-                // lParam == -1 is a special value if context menu is opened by Shift-F10 or Menu key.
-                if ((long)m.LParam == -1)
-                {
-                    this._contextMenuNode = GetVisibleSelectedNode();
-                }
-                else
-                {
-                    var p = this.PointToClient(new Point(
-                        unchecked((short)(long)m.LParam),
-                        unchecked((short)((long)m.LParam >> 16))));
-                    this._contextMenuNode = (XmlTreeNode)this.GetNodeAt(p);
-                }
-            }
-
-            base.WndProc(ref m);
-        }
-#endregion
-
 #region Designer
-        [Browsable(false)]
-        [Category("Data")]
-        [Description("The XML tree or sub-tree to be displayed.")]
-        [DefaultValue(null)]
-        public XmlNode Root
-        {
-            get { return _rootXmlNode; }
-            set { this.Init(value); }
-        }
-
         [Browsable(true)]
         [Category("Behavior")]
         [Description("Indicates whether the user can edit the XML.")]
@@ -428,98 +293,25 @@ namespace XmlTreeViewWindowsFormsApplication
         [Category("Appearance")]
         [Description("Color of XML comments.")]
         [DefaultValue(typeof(Color), "DarkGreen")]
-        public Color CommentColor {
+        public Color CommentColor
+        {
             get { return _commentColor; }
             set { if (_commentColor != value) { _commentColor = value; UpdateTree(); } }
         }
 #endregion
 
-        private void Init(XmlNode root)
+        protected void OnXmlDocumentNodeModified(XmlNode xmlNode)
         {
-            if (_rootXmlNode == root)
-                return;
-
-            this.BeginUpdate();
-
-            Clear();
-
-            var xmlDocument = GetXmlDocument(root);
-            if (xmlDocument != null)
-            {
-                _rootXmlNode = root;
-                _xmlDocument = xmlDocument;
-                UpdateTree();
-                RegisterEvents();
-            }
-
-            this.EndUpdate();
-        }
-
-        private void Clear()
-        {
-            if (_rootXmlNode != null)
-            {
-                UnregisterEvents();
-                this.Nodes.Clear();
-                this._displayedNodes.Clear();
-                _rootXmlNode = null;
-                _xmlDocument = null;
-            }
-        }
-
-        private void RegisterEvents()
-        {
-            _xmlDocument.NodeChanged += OnDocumentNodeModified;
-            _xmlDocument.NodeInserted += OnDocumentNodeModified;
-            _xmlDocument.NodeRemoved += OnDocumentNodeModified;
-        }
-
-        private void UnregisterEvents()
-        {
-            if (_rootXmlNode == null)
-                return;
-
-            _xmlDocument.NodeChanged -= OnDocumentNodeModified;
-            _xmlDocument.NodeInserted -= OnDocumentNodeModified;
-            _xmlDocument.NodeRemoved -= OnDocumentNodeModified;
-        }
-
-        protected static XmlDocument GetXmlDocument(XmlNode node)
-        {
-            while (node != null && node.NodeType != XmlNodeType.Document)
-                node = node.ParentNode;
-
-            return (XmlDocument)node;
-        }
-
-        private void OnDocumentNodeModified(object sender, XmlNodeChangedEventArgs e)
-        {
-            if (_rootXmlNode == null)
-                return;
-
-            if (GetXmlDocument(_rootXmlNode) != _xmlDocument)
-            {
-                Clear(); // XML document did became invalid (e.g. root removed) => clear all
-                return;
-            }
-
-            if (_editBox.IsEditing && e.Node == _editBox.XmlTreeNode.XmlNode)
+            if (_editBox.IsEditing && xmlNode == _editBox.XmlTreeNode.XmlNode)
             {
                 EndEdit(false); // someone else modfied XML? => cancel edit
             }
-
-            if (e.Action == XmlNodeChangedAction.Insert || e.Action == XmlNodeChangedAction.Change)
-            {
-                UpdateNode(e.Node);
-            }
-            else if (e.Action == XmlNodeChangedAction.Remove)
-            {
-                RemoveNode(e.Node, e.OldParent);
-            }
         }
 
-        private void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
+        protected override void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
         {
+            OnXmlDocumentNodeModified(xmlNode);
+
             XmlTreeNode treeNode;
             if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
             {
@@ -531,46 +323,10 @@ namespace XmlTreeViewWindowsFormsApplication
             UpdateParentText(xmlNode, xmlOldParentNode);
         }
 
-        public void WriteConsole()
+        protected override void UpdateNode(XmlNode xmlNode)
         {
-            Console.WriteLine($"BEGIN {this.Name}");
+            OnXmlDocumentNodeModified(xmlNode);
 
-            WriteConsole(this.Nodes, "");
-
-            Console.WriteLine($"END {this.Name}");
-        }
-
-        private void WriteConsole(TreeNodeCollection nodes, string indent)
-        {
-            indent += "  ";
-            foreach (XmlTreeNode node in nodes)
-            {
-                Console.WriteLine($"{indent}{node.Text}");
-
-                WriteConsole(node.Nodes, indent);
-            }
-        }
-
-        private void UpdateTree()
-        {
-            if (_xmlDocument != null && _rootXmlNode != null)
-            {
-                UpdateTree(_rootXmlNode);
-            }
-        }
-
-        private void UpdateTree(XmlNode xmlNode)
-        {
-            foreach (XmlNode xmlChildNode in xmlNode.ChildNodes)
-            {
-                UpdateTree(xmlChildNode);
-            }
-
-            UpdateNode(xmlNode);
-        }
-
-        private void UpdateNode(XmlNode xmlNode)
-        {
             XmlTreeNode treeNode;
             if (!_displayedNodes.TryGetValue(xmlNode, out treeNode) && xmlNode != _rootXmlNode)
             {
@@ -604,82 +360,11 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        private XmlTreeNode UpdateLinks(XmlTreeNode treeNode)
+        protected override void OnScrolling()
         {
-            XmlNode xmlNode = treeNode.XmlNode;
+            base.OnScrolling();
 
-            // try to connect parent
-            TreeNodeCollection nodesOfParent = null;
-            if (xmlNode.ParentNode == _rootXmlNode)
-            {
-                nodesOfParent = this.Nodes;
-            }
-            else if (xmlNode.ParentNode != null)
-            {
-                XmlTreeNode parentTreeNode;
-                if (_displayedNodes.TryGetValue(xmlNode.ParentNode, out parentTreeNode))
-                {
-                    nodesOfParent = parentTreeNode.Nodes;
-                }
-            }
-
-            UpdateChildren(xmlNode.ParentNode, nodesOfParent);
-
-            // try to connect children
-            UpdateChildren(xmlNode, treeNode.Nodes);
-
-            return treeNode;
-        }
-
-        private void UpdateChildren(XmlNode xmlNode, TreeNodeCollection treeChildren)
-        {
-            if (xmlNode == null || treeChildren == null)
-                return;
-
-            var newChildren = new List<TreeNode>();
-            foreach (XmlNode xmlChild in xmlNode.ChildNodes.Cast<XmlNode>())
-            {
-                XmlTreeNode treeChild;
-                if (_displayedNodes.TryGetValue(xmlChild, out treeChild))
-                {
-                    newChildren.Add(treeChild);
-                }
-            }
-
-#if false
-            // simple, but causes flickering
-            treeChildren.Clear();
-            treeChildren.AddRange(newChildren.ToArray());
-#else
-            // modify only what has changed to avoid flickering
-            for (int index = 0; index < newChildren.Count; index++)
-            {
-                if (index >= treeChildren.Count)
-                {
-                    treeChildren.AddRange(newChildren.Skip(index).ToArray());
-                    break;
-                }
-
-                var newChild = newChildren[index];
-                var treeChild = treeChildren[index];
-                if (newChild == treeChild)
-                {
-                    continue;
-                }
-
-                // removed nodes are already removed from treeChildren automatically;
-                // child nodes are unique (no child appears twice in the list of children);
-                // newChildren and treeChildren are the same for i < index;
-                // => treeChild must be in newChildren at higher position than index
-                Debug.Assert(newChildren.IndexOf(treeChild) > index);
-
-                // a move consists of a remove and an add;
-                // removed nodes are already removed from treeChildren automatically;
-                // => we only have to consider add, newChild can not be in treeChildren
-                Debug.Assert(treeChildren.IndexOf(newChild) < 0);
-                treeChildren.Insert(index, newChild);
-            }
-#endif
+            this.EndEdit();
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -767,54 +452,5 @@ namespace XmlTreeViewWindowsFormsApplication
                 BeginEdit(node);
             }
         }
-
-        protected override void OnForeColorChanged(EventArgs e)
-        {
-            base.OnForeColorChanged(e);
-
-            InvalidateBorder();
-        }
-
-        protected override void OnBackColorChanged(EventArgs e)
-        {
-            base.OnBackColorChanged(e);
-
-            InvalidateBorder();
-        }
-
-        protected void InvalidateBorder()
-        {
-            RedrawWindow(this.Handle, IntPtr.Zero, IntPtr.Zero, RDW_FRAME | RDW_INVALIDATE);
-        }
-
-#region P/Invoke
-        private const int SM_CXEDGE = 45;
-        private const int SM_CYEDGE = 46;
-        private const int SM_CXBORDER = 5;
-        private const int SM_CYBORDER = 6;
-        [DllImport("user32.dll")]
-        private static extern int GetSystemMetrics(int nIndex);
-
-        private const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
-        private const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
-        private const int TVS_EX_DOUBLEBUFFER = 0x0004;
-        [DllImport("user32.dll")]
-        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wp, IntPtr lp);
-
-        private const uint RDW_INVALIDATE = 0x0001;
-        private const uint RDW_INTERNALPAINT = 0x0002;
-        private const uint RDW_ERASE = 0x0004;
-        private const uint RDW_VALIDATE = 0x0008;
-        private const uint RDW_NOINTERNALPAINT = 0x0010;
-        private const uint RDW_NOERASE = 0x0020;
-        private const uint RDW_NOCHILDREN = 0x0040;
-        private const uint RDW_ALLCHILDREN = 0x0080;
-        private const uint RDW_UPDATENOW = 0x0100;
-        private const uint RDW_ERASENOW = 0x0200;
-        private const uint RDW_FRAME = 0x0400;
-        private const uint RDW_NOFRAME = 0x0800;
-        [DllImport("user32.dll")]
-        private static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
-#endregion
     }
 }

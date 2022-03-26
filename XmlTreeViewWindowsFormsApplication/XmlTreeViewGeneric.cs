@@ -43,7 +43,7 @@ namespace XmlTreeViewWindowsFormsApplication
             InitializeComponent();
         }
 
-        protected override void OnNodeRemoved(XmlNode xmlNode, XmlNode xmlOldParentNode)
+        protected override void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
         {
             XmlTreeNode treeNode;
             if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
@@ -53,7 +53,7 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        protected override void OnNodeUpdated(XmlNode xmlNode)
+        protected override void UpdateNode(XmlNode xmlNode)
         {
             XmlTreeNode treeNode;
             if (!_displayedNodes.TryGetValue(xmlNode, out treeNode) && xmlNode != _rootXmlNode)

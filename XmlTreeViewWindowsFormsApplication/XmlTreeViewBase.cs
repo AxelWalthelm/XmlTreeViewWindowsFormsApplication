@@ -107,7 +107,7 @@ namespace XmlTreeViewWindowsFormsApplication
                 UpdateTree(xmlChildNode);
             }
 
-            OnNodeUpdated(xmlNode);
+            UpdateNode(xmlNode);
         }
 
         private void OnDocumentNodeModified(object sender, XmlNodeChangedEventArgs e)
@@ -123,17 +123,20 @@ namespace XmlTreeViewWindowsFormsApplication
 
             if (e.Action == XmlNodeChangedAction.Remove)
             {
-                OnNodeRemoved(e.Node, e.OldParent);
+                OnXmlDocumentNodeModified(e.Node, e.OldParent);
+                RemoveNode(e.Node, e.OldParent);
             }
             else
             {
                 Debug.Assert(e.Action == XmlNodeChangedAction.Insert || e.Action == XmlNodeChangedAction.Change);
-                OnNodeUpdated(e.Node);
+                OnXmlDocumentNodeModified(e.Node, e.Node.ParentNode);
+                UpdateNode(e.Node);
             }
         }
 
-        protected abstract void OnNodeUpdated(XmlNode xmlNode);
-        protected abstract void OnNodeRemoved(XmlNode node, XmlNode oldParent);
+        protected virtual void OnXmlDocumentNodeModified(XmlNode xmlNode, XmlNode xmlParentNode) { }
+        protected abstract void UpdateNode(XmlNode xmlNode);
+        protected abstract void RemoveNode(XmlNode node, XmlNode oldParent);
 
         // Assumes that the XML tree structure is basically displayed as is, but some leaves or sub-trees may be omitted.
         // More advanced views may need a different implementation of UpdateLinks().
@@ -252,14 +255,16 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 
 #region Detect scrolling and the node a context menu is opened on
-        private const int WM_VSCROLL = 0x0115;
-        private const int WM_CONTEXTMENU = 0x007B;
         private TreeNode _contextMenuNode;
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == WM_VSCROLL)
             {
-                OnScrolling();
+                OnScroll();
+            }
+            else if (m.Msg == WM_PAINT)
+            {
+                OnPaint();
             }
             else if (m.Msg == WM_CONTEXTMENU)
             {
@@ -280,7 +285,8 @@ namespace XmlTreeViewWindowsFormsApplication
             base.WndProc(ref m);
         }
 
-        protected virtual void OnScrolling() { }
+        protected virtual void OnScroll() { }
+        protected virtual void OnPaint() { }
 #endregion
 
         private void RegisterEvents()
@@ -412,6 +418,9 @@ namespace XmlTreeViewWindowsFormsApplication
         [DllImport("user32.dll")]
         public static extern int GetSystemMetrics(int nIndex);
 
+        public const int WM_PAINT = 0x000F;
+        public const int WM_CONTEXTMENU = 0x007B;
+        public const int WM_VSCROLL = 0x0115;
         public const int TVM_SETEXTENDEDSTYLE = 0x1100 + 44;
         public const int TVM_GETEXTENDEDSTYLE = 0x1100 + 45;
         public const int TVS_EX_DOUBLEBUFFER = 0x0004;

@@ -72,12 +72,13 @@ namespace XmlTreeViewWindowsFormsApplication
             public new void BeginEdit()
             {
                 Debug.Assert(EditBox != null);
-                Debug.Assert(EditBox.XmlTreeNode == null);
+                Debug.Assert(EditBox.TreeNode == null);
                 Debug.Assert(IsEditable);
                 Debug.Assert(!IsEditing);
 
                 SetText(false);
                 Rectangle bounds = Bounds;
+                EditBox.TreeNodeBounds = bounds;
                 bounds.X += bounds.Width;
                 int borderX = GetSystemMetrics(SM_CXBORDER);
                 int borderY = GetSystemMetrics(SM_CYBORDER);
@@ -91,16 +92,16 @@ namespace XmlTreeViewWindowsFormsApplication
                 EditBox.Focus();
 
                 Debug.Assert(!IsEditing);
-                EditBox.XmlTreeNode = this;
+                EditBox.TreeNode = this;
                 Debug.Assert(IsEditing);
             }
 
             public new void EndEdit(bool cancel)
             {
                 Debug.Assert(EditBox != null);
-                Debug.Assert(EditBox.XmlTreeNode != null);
+                Debug.Assert(EditBox.TreeNode != null);
                 EditBox.Visible = false;
-                EditBox.XmlTreeNode = null;
+                EditBox.TreeNode = null;
                 TreeView.Focus(); // ensure focus goes to tree view (most of the time this happens automatically)
 
                 if (cancel || string.Equals(EditableValue, EditBox.Text, StringComparison.OrdinalIgnoreCase))
@@ -139,23 +140,48 @@ namespace XmlTreeViewWindowsFormsApplication
 
         public class EditBox : TextBox
         {
-            public readonly XmlTreeViewSimple Host;
-            public XmlTreeNode XmlTreeNode;
+            public readonly XmlTreeViewSimple TreeView;
+            public XmlTreeNode TreeNode;
+            public Rectangle TreeNodeBounds;
 
-            public bool IsEditing => XmlTreeNode != null && Visible;
+            public bool IsEditing => TreeNode != null && this.Visible;
 
-            public EditBox(XmlTreeViewSimple host)
+            public EditBox(XmlTreeViewSimple treeView)
             {
-                Host = host;
+                TreeView = treeView;
                 this.Visible = false;
-                Host.Controls.Add(this);
+                this.ForeColor = TreeView.ForeColor;
+                this.BackColor = TreeView.BackColor;
+                this.Font = TreeView.Font;
+                TreeView.Controls.Add(this);
+            }
+
+            protected override void OnParentForeColorChanged(EventArgs e)
+            {
+                base.OnParentForeColorChanged(e);
+
+                this.ForeColor = TreeView.ForeColor;
+            }
+
+            protected override void OnParentBackColorChanged(EventArgs e)
+            {
+                base.OnParentBackColorChanged(e);
+
+                this.BackColor = TreeView.BackColor;
+            }
+
+            protected override void OnParentFontChanged(EventArgs e)
+            {
+                base.OnParentFontChanged(e);
+
+                this.Font = TreeView.Font;
             }
 
             protected override void OnLostFocus(EventArgs e)
             {
                 base.OnLostFocus(e);
 
-                Host.EndEdit();
+                TreeView.EndEdit();
             }
 
             protected override void OnKeyDown(KeyEventArgs e)
@@ -165,18 +191,18 @@ namespace XmlTreeViewWindowsFormsApplication
                 switch (e.KeyCode)
                 {
                     case Keys.Escape:
-                        Host.EndEdit(false);
+                        TreeView.EndEdit(false);
                         e.Handled = true;
                         break;
 
                     case Keys.Enter:
-                        Host.EndEdit();
+                        TreeView.EndEdit();
                         e.Handled = true;
                         break;
 
                     case Keys.Up:
                     case Keys.Down:
-                        Host.NextEdit(e.KeyCode == Keys.Down);
+                        TreeView.NextEdit(e.KeyCode == Keys.Down);
                         e.Handled = true;
                         break;
                 }
@@ -276,7 +302,6 @@ namespace XmlTreeViewWindowsFormsApplication
         public XmlTreeViewSimple()
         {
             InitializeComponent();
-            //base.LabelEdit = true;
             _editBox = new EditBox(this);
         }
 
@@ -300,11 +325,13 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 #endregion
 
-        protected void OnXmlDocumentNodeModified(XmlNode xmlNode, XmlNode xmlParentNode)
+        protected override void OnXmlDocumentNodeModified(XmlNode xmlNode, XmlNode xmlParentNode)
         {
+            base.OnXmlDocumentNodeModified(xmlNode, xmlParentNode);
+
             if (IsEditing)
             {
-                var xmlEdit = _editBox.XmlTreeNode.XmlNode;
+                var xmlEdit = _editBox.TreeNode.XmlNode;
                 if (GetXmlDocument(xmlEdit) != _xmlDocument ||
                     xmlNode == xmlEdit ||
                     xmlNode.NodeType == XmlNodeType.Text && xmlParentNode == xmlEdit)
@@ -314,10 +341,8 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        protected override void OnNodeRemoved(XmlNode xmlNode, XmlNode xmlOldParentNode)
+        protected override void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
         {
-            OnXmlDocumentNodeModified(xmlNode, xmlOldParentNode);
-
             XmlTreeNode treeNode;
             if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
             {
@@ -329,10 +354,8 @@ namespace XmlTreeViewWindowsFormsApplication
             UpdateParentText(xmlNode, xmlOldParentNode);
         }
 
-        protected override void OnNodeUpdated(XmlNode xmlNode)
+        protected override void UpdateNode(XmlNode xmlNode)
         {
-            OnXmlDocumentNodeModified(xmlNode, xmlNode.ParentNode);
-
             XmlTreeNode treeNode;
             if (!_displayedNodes.TryGetValue(xmlNode, out treeNode) && xmlNode != _rootXmlNode)
             {
@@ -373,11 +396,27 @@ namespace XmlTreeViewWindowsFormsApplication
             base.Clear();
         }
 
-        protected override void OnScrolling()
+        protected override void OnScroll()
         {
             this.EndEdit();
 
-            base.OnScrolling();
+            base.OnScroll();
+        }
+
+        // note: protected override void OnPaint(PaintEventArgs e) is not called
+        protected override void OnPaint()
+        {
+            base.OnPaint();
+
+            if (!IsEditing)
+                return;
+
+            Rectangle old = _editBox.TreeNodeBounds;
+            Rectangle now = _editBox.TreeNode.Bounds;
+            if (old.X != now.X || old.Y != now.Y || old.Height != now.Height)
+            {
+                this.EndEdit();
+            }
         }
 
         protected override void OnSizeChanged(EventArgs e)
@@ -442,11 +481,8 @@ namespace XmlTreeViewWindowsFormsApplication
 
         protected void EndEdit(bool acceptChanges = true)
         {
-            if (!IsEditing)
-                return;
-
-            XmlTreeNode node = _editBox.XmlTreeNode;
-            node.EndEdit(!acceptChanges);
+            if (IsEditing)
+                _editBox.TreeNode.EndEdit(!acceptChanges);
         }
 
         protected void NextEdit(bool forward)
@@ -454,7 +490,7 @@ namespace XmlTreeViewWindowsFormsApplication
             if (!IsEditing)
                 return;
 
-            var node = _editBox.XmlTreeNode;
+            var node = _editBox.TreeNode;
             EndEdit();
 
             node = (XmlTreeNode)(forward ? node.NextVisibleNode : node.PrevVisibleNode);

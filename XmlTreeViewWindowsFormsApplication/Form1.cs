@@ -106,12 +106,14 @@ namespace XmlTreeViewWindowsFormsApplication
                 this.xmlTreeView2.CommentColor = SystemColors.Highlight;
                 this.xmlTreeView2.ForeColor = SystemColors.GrayText;
                 this.xmlTreeView2.BackColor = SystemColors.WindowText;
+                this.xmlTreeView2.Font = this.Font;
             }
             else
             {
                 this.xmlTreeView2.CommentColor = Color.Orange;
                 this.xmlTreeView2.ForeColor = this.xmlTreeView1.ForeColor;
                 this.xmlTreeView2.BackColor = this.xmlTreeView1.BackColor;
+                this.xmlTreeView2.Font = this.Font; // new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             }
         }
 

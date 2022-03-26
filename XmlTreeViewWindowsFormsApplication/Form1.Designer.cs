@@ -35,6 +35,8 @@
             this.contextMenuStripXmlTreeView = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.insertToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.xmlTreeViewGeneric1 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewGeneric();
             this.xmlTreeView2 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
             this.xmlTreeView1 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
             this.contextMenuStripXmlTreeView.SuspendLayout();
@@ -54,7 +56,7 @@
             // buttonSave
             // 
             this.buttonSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.buttonSave.Location = new System.Drawing.Point(425, 432);
+            this.buttonSave.Location = new System.Drawing.Point(685, 432);
             this.buttonSave.Name = "buttonSave";
             this.buttonSave.Size = new System.Drawing.Size(75, 23);
             this.buttonSave.TabIndex = 4;
@@ -65,7 +67,7 @@
             // buttonReset
             // 
             this.buttonReset.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
-            this.buttonReset.Location = new System.Drawing.Point(220, 432);
+            this.buttonReset.Location = new System.Drawing.Point(350, 432);
             this.buttonReset.Name = "buttonReset";
             this.buttonReset.Size = new System.Drawing.Size(75, 23);
             this.buttonReset.TabIndex = 3;
@@ -95,10 +97,24 @@
             this.deleteToolStripMenuItem.Size = new System.Drawing.Size(131, 22);
             this.deleteToolStripMenuItem.Text = "Delete";
             // 
+            // timer1
+            // 
+            this.timer1.Interval = 1000;
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
+            // 
+            // xmlTreeViewGeneric1
+            // 
+            this.xmlTreeViewGeneric1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.xmlTreeViewGeneric1.LabelEdit = true;
+            this.xmlTreeViewGeneric1.Location = new System.Drawing.Point(506, 13);
+            this.xmlTreeViewGeneric1.Name = "xmlTreeViewGeneric1";
+            this.xmlTreeViewGeneric1.Size = new System.Drawing.Size(253, 413);
+            this.xmlTreeViewGeneric1.TabIndex = 5;
+            // 
             // xmlTreeView2
             // 
-            this.xmlTreeView2.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Right)));
+            this.xmlTreeView2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)));
             this.xmlTreeView2.BackColor = System.Drawing.SystemColors.WindowText;
             this.xmlTreeView2.CommentColor = System.Drawing.SystemColors.Highlight;
             this.xmlTreeView2.ContextMenuStrip = this.contextMenuStripXmlTreeView;
@@ -124,7 +140,8 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(512, 467);
+            this.ClientSize = new System.Drawing.Size(772, 467);
+            this.Controls.Add(this.xmlTreeViewGeneric1);
             this.Controls.Add(this.buttonSave);
             this.Controls.Add(this.buttonReset);
             this.Controls.Add(this.buttonLoad);
@@ -132,7 +149,7 @@
             this.Controls.Add(this.xmlTreeView1);
             this.Name = "Form1";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
-            this.Text = "SimpleXmlTreeView";
+            this.Text = "XmlTreeViews";
             this.SizeChanged += new System.EventHandler(this.Form1_SizeChanged);
             this.contextMenuStripXmlTreeView.ResumeLayout(false);
             this.ResumeLayout(false);
@@ -149,6 +166,8 @@
         private System.Windows.Forms.ContextMenuStrip contextMenuStripXmlTreeView;
         private System.Windows.Forms.ToolStripMenuItem insertToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem deleteToolStripMenuItem;
+        private XmlTreeViewGeneric xmlTreeViewGeneric1;
+        private System.Windows.Forms.Timer timer1;
     }
 }
 

@@ -300,17 +300,23 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 #endregion
 
-        protected void OnXmlDocumentNodeModified(XmlNode xmlNode)
+        protected void OnXmlDocumentNodeModified(XmlNode xmlNode, XmlNode xmlParentNode)
         {
-            if (_editBox.IsEditing && xmlNode == _editBox.XmlTreeNode.XmlNode)
+            if (IsEditing)
             {
-                EndEdit(false); // someone else modfied XML? => cancel edit
+                var xmlEdit = _editBox.XmlTreeNode.XmlNode;
+                if (GetXmlDocument(xmlEdit) != _xmlDocument ||
+                    xmlNode == xmlEdit ||
+                    xmlNode.NodeType == XmlNodeType.Text && xmlParentNode == xmlEdit)
+                {
+                    EndEdit(false); // someone else modfied XML we are editing? => cancel edit
+                }
             }
         }
 
-        protected override void RemoveNode(XmlNode xmlNode, XmlNode xmlOldParentNode)
+        protected override void OnNodeRemoved(XmlNode xmlNode, XmlNode xmlOldParentNode)
         {
-            OnXmlDocumentNodeModified(xmlNode);
+            OnXmlDocumentNodeModified(xmlNode, xmlOldParentNode);
 
             XmlTreeNode treeNode;
             if (_displayedNodes.TryGetValue(xmlNode, out treeNode))
@@ -323,9 +329,9 @@ namespace XmlTreeViewWindowsFormsApplication
             UpdateParentText(xmlNode, xmlOldParentNode);
         }
 
-        protected override void UpdateNode(XmlNode xmlNode)
+        protected override void OnNodeUpdated(XmlNode xmlNode)
         {
-            OnXmlDocumentNodeModified(xmlNode);
+            OnXmlDocumentNodeModified(xmlNode, xmlNode.ParentNode);
 
             XmlTreeNode treeNode;
             if (!_displayedNodes.TryGetValue(xmlNode, out treeNode) && xmlNode != _rootXmlNode)
@@ -360,18 +366,25 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
+        protected override void Clear()
+        {
+            this.EndEdit();
+
+            base.Clear();
+        }
+
         protected override void OnScrolling()
         {
-            base.OnScrolling();
-
             this.EndEdit();
+
+            base.OnScrolling();
         }
 
         protected override void OnSizeChanged(EventArgs e)
         {
-            base.OnSizeChanged(e);
+            this.EndEdit();
 
-            EndEdit();
+            base.OnSizeChanged(e);
         }
 
         protected override void OnLayout(LayoutEventArgs levent)

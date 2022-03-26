@@ -63,6 +63,12 @@
     <Compile Include="XmlAutoSave.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="XmlTreeViewGeneric.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="XmlTreeViewGeneric.Designer.cs">
+      <DependentUpon>XmlTreeViewGeneric.cs</DependentUpon>
+    </Compile>
     <Compile Include="XmlTreeViewSimple.cs">
       <SubType>Component</SubType>
     </Compile>

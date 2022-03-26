@@ -59,7 +59,7 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 #endregion
 
-        private void Init(XmlNode root)
+        protected virtual void Init(XmlNode root)
         {
             if (_rootXmlNode == root)
                 return;
@@ -80,7 +80,7 @@ namespace XmlTreeViewWindowsFormsApplication
             this.EndUpdate();
         }
 
-        private void Clear()
+        protected virtual void Clear()
         {
             if (_rootXmlNode != null)
             {
@@ -107,7 +107,7 @@ namespace XmlTreeViewWindowsFormsApplication
                 UpdateTree(xmlChildNode);
             }
 
-            UpdateNode(xmlNode);
+            OnNodeUpdated(xmlNode);
         }
 
         private void OnDocumentNodeModified(object sender, XmlNodeChangedEventArgs e)
@@ -123,17 +123,17 @@ namespace XmlTreeViewWindowsFormsApplication
 
             if (e.Action == XmlNodeChangedAction.Remove)
             {
-                RemoveNode(e.Node, e.OldParent);
+                OnNodeRemoved(e.Node, e.OldParent);
             }
             else
             {
                 Debug.Assert(e.Action == XmlNodeChangedAction.Insert || e.Action == XmlNodeChangedAction.Change);
-                UpdateNode(e.Node);
+                OnNodeUpdated(e.Node);
             }
         }
 
-        protected abstract void UpdateNode(XmlNode xmlNode);
-        protected abstract void RemoveNode(XmlNode node, XmlNode oldParent);
+        protected abstract void OnNodeUpdated(XmlNode xmlNode);
+        protected abstract void OnNodeRemoved(XmlNode node, XmlNode oldParent);
 
         // Assumes that the XML tree structure is basically displayed as is, but some leaves or sub-trees may be omitted.
         // More advanced views may need a different implementation of UpdateLinks().
@@ -224,11 +224,12 @@ namespace XmlTreeViewWindowsFormsApplication
             {
                 yield return node;
 
-                EnumerateAllNodes(node.Nodes);
+                foreach (TREE_NODE n in EnumerateAllNodes(node.Nodes))
+                    yield return n;
             }
         }
 
-        protected IEnumerable<TREE_NODE> AllNodes => EnumerateAllNodes(this.Nodes);
+        public IEnumerable<TREE_NODE> AllNodes => EnumerateAllNodes(this.Nodes);
 
         protected TREE_NODE GetVisibleSelectedNode()
         {
@@ -241,6 +242,7 @@ namespace XmlTreeViewWindowsFormsApplication
             return b.IsEmpty ? null : (TREE_NODE) node;
         }
 
+        // Note that node.OwnerDocument may still be set after node was removed from tree structure
         protected static XmlDocument GetXmlDocument(XmlNode node)
         {
             while (node != null && node.NodeType != XmlNodeType.Document)

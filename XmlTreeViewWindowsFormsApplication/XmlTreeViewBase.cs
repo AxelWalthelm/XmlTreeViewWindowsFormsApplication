@@ -221,6 +221,7 @@ namespace XmlTreeViewWindowsFormsApplication
 #endif
         }
 
+#if true
         protected IEnumerable<TREE_NODE> EnumerateAllNodes(TreeNodeCollection nodes)
         {
             foreach (TREE_NODE node in nodes)
@@ -231,6 +232,33 @@ namespace XmlTreeViewWindowsFormsApplication
                     yield return n;
             }
         }
+#else
+        protected IEnumerable<TREE_NODE> EnumerateAllNodes(TreeNodeCollection nodes)
+        {
+            foreach (TreeNode root in nodes)
+            {
+                TreeNode node = root;
+                do
+                {
+                    yield return (TREE_NODE)node;
+
+                    if (node.Nodes.Count > 0)
+                    {
+                        node = node.Nodes[0]; // step down
+                    }
+                    else
+                    {
+                        while (node.NextNode == null && node != root)
+                        {
+                            node = node.Parent; // walk up until we can step next or reach root
+                        }
+                        node = node.NextNode; // step next
+                    }
+                }
+                while (node != root.NextNode);
+            }
+        }
+#endif
 
         public IEnumerable<TREE_NODE> AllNodes => EnumerateAllNodes(this.Nodes);
 

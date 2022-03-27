@@ -221,46 +221,18 @@ namespace XmlTreeViewWindowsFormsApplication
 #endif
         }
 
-#if true
-        protected IEnumerable<TREE_NODE> EnumerateAllNodes(TreeNodeCollection nodes)
+        protected IEnumerable<KeyValuePair<TREE_NODE, int>> EnumerateTree(TreeNodeCollection rootChildren, int level = 0)
         {
-            foreach (TREE_NODE node in nodes)
+            foreach (TREE_NODE node in rootChildren)
             {
-                yield return node;
+                yield return new KeyValuePair<TREE_NODE, int>(node, level);
 
-                foreach (TREE_NODE n in EnumerateAllNodes(node.Nodes))
-                    yield return n;
+                foreach (var kvp in EnumerateTree(node.Nodes, level + 1))
+                    yield return kvp;
             }
         }
-#else
-        protected IEnumerable<TREE_NODE> EnumerateAllNodes(TreeNodeCollection nodes)
-        {
-            foreach (TreeNode root in nodes)
-            {
-                TreeNode node = root;
-                do
-                {
-                    yield return (TREE_NODE)node;
 
-                    if (node.Nodes.Count > 0)
-                    {
-                        node = node.Nodes[0]; // step down
-                    }
-                    else
-                    {
-                        while (node.NextNode == null && node != root)
-                        {
-                            node = node.Parent; // walk up until we can step next or reach root
-                        }
-                        node = node.NextNode; // step next
-                    }
-                }
-                while (node != root.NextNode);
-            }
-        }
-#endif
-
-        public IEnumerable<TREE_NODE> AllNodes => EnumerateAllNodes(this.Nodes);
+        public IEnumerable<TREE_NODE> AllNodes => EnumerateTree(this.Nodes).Select(kvp => kvp.Key);
 
         protected TREE_NODE GetVisibleSelectedNode()
         {
@@ -401,19 +373,16 @@ namespace XmlTreeViewWindowsFormsApplication
         {
             Console.WriteLine($"BEGIN {this.Name}");
 
-            WriteConsole(this.Nodes, "");
+            WriteConsole(this.Nodes);
 
             Console.WriteLine($"END {this.Name}");
         }
 
-        private void WriteConsole(TreeNodeCollection nodes, string indent)
+        private void WriteConsole(TreeNodeCollection nodes, int level = 0)
         {
-            indent += "  ";
-            foreach (TreeNode node in nodes)
+            foreach (KeyValuePair<TREE_NODE, int> kvp in this.EnumerateTree(nodes, level))
             {
-                Console.WriteLine($"{indent}{node.Text}");
-
-                WriteConsole(node.Nodes, indent);
+                Console.WriteLine($"{new string(' ', kvp.Value * 2 + 2)}{kvp.Key.Text}");
             }
         }
 

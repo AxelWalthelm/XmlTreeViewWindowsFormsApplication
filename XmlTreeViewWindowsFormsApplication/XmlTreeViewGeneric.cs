@@ -154,7 +154,7 @@ namespace XmlTreeViewWindowsFormsApplication
 
         protected void RemoveXmlNode(XmlNode xmlNode)
         {
-            int nrNodes = 1 + EnumerateAllNodes(_displayedNodes[xmlNode].Nodes).Count();
+            int nrNodes = 1 + EnumerateTree(_displayedNodes[xmlNode].Nodes).Count();
             var dialogResult = MessageBox.Show($"Remove {nrNodes} item(s) without undo?", "Delete", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
             if (dialogResult == DialogResult.OK)
             {

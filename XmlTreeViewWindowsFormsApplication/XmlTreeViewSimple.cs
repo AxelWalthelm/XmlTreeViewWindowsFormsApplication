@@ -231,7 +231,7 @@ namespace XmlTreeViewWindowsFormsApplication
                     break;
 
                 case "insertToolStripMenuItem":
-                    using (var form = new SimpleXmlTreeViewInsertDialog())
+                    using (var form = new XmlTreeViewSimpleInsertDialog())
                     {
                         if (form.ShowDialog(this) == DialogResult.OK)
                         {
@@ -256,7 +256,7 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        private void InsertNewXmlNode(XmlNode xmlNode, SimpleXmlTreeViewInsertDialog.Results result)
+        private void InsertNewXmlNode(XmlNode xmlNode, XmlTreeViewSimpleInsertDialog.Results result)
         {
             XmlNode newNode = null;
             if (result.Name == "" && result.Value == "" && result.Comment != "")
@@ -277,13 +277,13 @@ namespace XmlTreeViewWindowsFormsApplication
                 }
             }
 
-            if (result.InsertLocation == SimpleXmlTreeViewInsertDialog.Results.InsertLocations.Inside &&
+            if (result.InsertLocation == XmlTreeViewSimpleInsertDialog.Results.InsertLocations.Inside &&
                 xmlNode.NodeType != XmlNodeType.Comment) // can not insert in comments => insert after
             {
                 xmlNode.PrependChild(newNode);
                 _displayedNodes[xmlNode].ExpandAll();
             }
-            else if (result.InsertLocation == SimpleXmlTreeViewInsertDialog.Results.InsertLocations.Before)
+            else if (result.InsertLocation == XmlTreeViewSimpleInsertDialog.Results.InsertLocations.Before)
             {
                 xmlNode.ParentNode.InsertBefore(newNode, xmlNode);
             }

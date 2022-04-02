@@ -10,12 +10,12 @@ using System.Windows.Forms;
 
 namespace XmlTreeViewWindowsFormsApplication
 {
-    public partial class SimpleXmlTreeViewInsertDialog : Form
+    public partial class XmlTreeViewSimpleInsertDialog : Form
     {
         protected static string InsertDefault = "radioButtonInsertAfter";
         private IEnumerable<RadioButton> InsertButtons => this.groupBoxInsertWhere.Controls.OfType<RadioButton>();
 
-        public SimpleXmlTreeViewInsertDialog()
+        public XmlTreeViewSimpleInsertDialog()
         {
             InitializeComponent();
 

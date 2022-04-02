@@ -1,6 +1,6 @@
 ﻿namespace XmlTreeViewWindowsFormsApplication
 {
-    partial class SimpleXmlTreeViewInsertDialog
+    partial class XmlTreeViewSimpleInsertDialog
     {
         /// <summary>
         /// Required designer variable.

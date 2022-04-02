@@ -362,9 +362,12 @@ namespace XmlTreeViewWindowsFormsApplication
             if (_contextMenuNode == null)
                 return;
 
-            OnContextMenuAction((TREE_NODE) _contextMenuNode, e);
-
+            var contextMenuNode = (TREE_NODE) _contextMenuNode;
             _contextMenuNode = null;
+
+            cms.Hide();
+
+            OnContextMenuAction(contextMenuNode, e);
         }
 
         protected virtual void OnContextMenuAction(TREE_NODE treeNode, ToolStripItemClickedEventArgs e) { }

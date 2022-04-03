@@ -208,7 +208,7 @@ namespace XmlTreeViewWindowsFormsApplication
         }
 
         [XmlType(TypeName = "faulty")]
-        public class TestData
+        public class TestDataType
         {
             public string Message;
             public string Null;
@@ -216,16 +216,16 @@ namespace XmlTreeViewWindowsFormsApplication
             public Point Loki { get; set; }
         }
 
+        TestDataType TestData = new TestDataType
+        {
+            Message = "Exception occurred",
+            ErrorCode = 1010,
+            Loki = new Point(47, 11),
+        };
+
         private void buttonWriteData_Click(object sender, EventArgs e)
         {
-            var fault = new TestData
-            {
-                Message = "Exception occurred",
-                ErrorCode = 1010,
-                Loki = new Point(47, 11),
-            };
-
-            var name = nameof(fault);
+            var name = nameof(TestData);
             var node = ((XmlTreeViewSimple.XmlTreeNode)this.xmlTreeView1.SelectedNode).XmlNode;
             if (node.NodeType != XmlNodeType.Element || node.LocalName != name)
             {
@@ -233,15 +233,21 @@ namespace XmlTreeViewWindowsFormsApplication
                 node.AppendChild(n);
                 node = n;
             }
-            XmlDataAccess.SerializeObject(node, fault);
+            XmlDataAccess.Write((XmlElement)node, TestData);
             Console.WriteLine("Write Data: " + node.OuterXml);
         }
 
         private void buttonReadData_Click(object sender, EventArgs e)
         {
             var node = ((XmlTreeViewSimple.XmlTreeNode)this.xmlTreeView1.SelectedNode).XmlNode;
-            var o = XmlDataAccess.DeseralizeObject(node, typeof(TestData));
-            Console.WriteLine("Read Data: " + o?.ToString());
+            if (node.NodeType != XmlNodeType.Element)
+            {
+                MessageBox.Show("Select an element node to read data");
+                return;
+            }
+
+            var data = XmlDataAccess.Read<TestDataType>((XmlElement)node);
+            Console.WriteLine("Read Data: " + data?.ToString());
         }
     }
 }

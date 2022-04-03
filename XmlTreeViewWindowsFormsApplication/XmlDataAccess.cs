@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -15,30 +16,49 @@ namespace XmlTreeViewWindowsFormsApplication
 {
     class XmlDataAccess
     {
-        public static object DeseralizeObject(XmlNode xmlNode, Type type)
+        public static T Read<T>(XmlElement xmlElement) => (T)DeseralizeObject(xmlElement, typeof(T));
+
+        public static T Read<T>(XmlElement xmlElement, T defaultValue) => (T)(DeseralizeObject(xmlElement, typeof(T)) ?? defaultValue);
+
+        public static void Write<T>(XmlElement xmlElement, T data) => SerializeObject(xmlElement, data, typeof(T));
+
+        private static string GetXmlTypeId(Type type) => Type.GetType(type.FullName) == type ? type.FullName : type.AssemblyQualifiedName;
+
+        private static object DeseralizeObject(XmlElement xmlElement, Type type)
         {
-            var overrides = new XmlAttributeOverrides();
-            overrides.Add(type, new XmlAttributes { XmlType = new XmlTypeAttribute(xmlNode.LocalName) });
-            XmlSerializer serializer = new XmlSerializer(type, overrides);
-            using (XmlReader reader = new XmlNodeReader(xmlNode))
+            var dataTypeName = xmlElement.GetAttribute("Type");
+            var dataType = string.IsNullOrEmpty(dataTypeName) ? type : Type.GetType(dataTypeName);
+            XmlSerializer serializer = new XmlSerializer(dataType, new XmlRootAttribute { ElementName = xmlElement.LocalName, Namespace = "" });
+            using (XmlReader reader = new XmlNodeReader(xmlElement))
             {
                 return serializer.Deserialize(reader);
             }
         }
 
-        public static void SerializeObject(XmlNode xmlNode, object o)
+        private static void SerializeObject(XmlElement xmlElement, object data, Type type)
         {
+            var dataType = data.GetType();
             var document = new XmlDocument();
             var navigator = document.CreateNavigator();
 
             using (XmlWriter writer = navigator.AppendChild())
             {
-                var serializer = new XmlSerializer(o.GetType());
+                var serializer = new XmlSerializer(dataType, new XmlRootAttribute { ElementName = xmlElement.LocalName, Namespace = "" });
                 var namespaces = new XmlSerializerNamespaces(new[] { XmlQualifiedName.Empty });
-                serializer.Serialize(writer, o, namespaces);
+                serializer.Serialize(writer, data);
             }
 
-            UpdateChildrenFromOtherDocument(xmlNode, document.FirstChild);
+            UpdateChildrenFromOtherDocument(xmlElement, document.FirstChild);
+
+            // TBD: should we always store type information or only in case of polymorphism?
+            if (dataType != type)
+            {
+                xmlElement.SetAttribute("Type", GetXmlTypeId(dataType));
+            }
+            else
+            {
+                xmlElement.RemoveAttribute("Type");
+            }
         }
 
         // Make oldNode have children equal to newNode, but modify only what has changed to avoid flickering,
@@ -46,92 +66,159 @@ namespace XmlTreeViewWindowsFormsApplication
         // (moving a node is both: delete and insert).
         // Document of newNode differs from the document of oldNode, so we need to copy them by XmlDocument.ImportNode().
         // When a node is different and needs be copied, all off its children are copied too.
-        // TODO/TBD: could we change nodes instead of replacing them?
         private static void UpdateChildrenFromOtherDocument(XmlNode oldNode, XmlNode newNode)
         {
-#if true // quick and simple
-            while (oldNode.ChildNodes.Count > 0)
-                oldNode.RemoveChild(oldNode.ChildNodes[0]);
+#if false // quick and simple
+            Debug.Assert(oldNode.NodeType == XmlNodeType.Element);
+            oldNode.Attributes.RemoveAll();
+            for (int i = 0; i < newNode.Attributes.Count; i++)
+                oldNode.Attributes.Append((XmlAttribute)oldNode.OwnerDocument.ImportNode(newNode.Attributes[i], true));
+
+            oldNode.RemoveAll();
             for (int i = 0; i < newNode.ChildNodes.Count; i++)
                 oldNode.AppendChild(oldNode.OwnerDocument.ImportNode(newNode.ChildNodes[i], true));
 #else
-            var oldDocument = oldNode.OwnerDocument;
+            if (oldNode.NodeType == XmlNodeType.Element)
+                UpdateChildrenFromOtherDocument(new XmlNodeChildren(oldNode, true), new XmlNodeChildren(newNode, true));
+            UpdateChildrenFromOtherDocument(new XmlNodeChildren(oldNode), new XmlNodeChildren(newNode));
+#endif
+        }
 
-            for (int index = 0; index < newNode.ChildNodes.Count; index++)
+        private static void UpdateChildrenFromOtherDocument(XmlNodeChildren oldChildren, XmlNodeChildren newChildren)
+        {
+            // Finding the minimal sequence of insert and delete to make oldNode have the same children as newNode
+            // is expensive, but in the most relevant cases only one child was inserted or removed or changed.
+            // So we implement a simpler strategy which has "only" worst case complexity O(n^2) and typical case complexity O(n).
+            // If only the value of a node changes, it can be fixed immediately.
+            if (oldChildren.Count == 0 && newChildren.Count == 0)
+                return;
+
+            var oldDocument = oldChildren.ParentNode.OwnerDocument;
+
+            for (int index = 0; index < newChildren.Count; index++)
             {
-                if (index >= oldNode.ChildNodes.Count)
+                if (index >= oldChildren.Count)
                 {
-                    var importNode = oldDocument.ImportNode(newNode.ChildNodes[index], true);
-                    oldNode.AppendChild(importNode);
+                    var importNode = oldDocument.ImportNode(newChildren[index], true);
+                    oldChildren.AppendChild(importNode);
                     continue;
                 }
 
-                // TODO/TBD: could we change nodes to make them equal?
-
-                if (IsEqual(oldNode.ChildNodes[index], newNode.ChildNodes[index]))
+                var equal = Compare(oldChildren[index], newChildren[index]);
+                if (equal == Similarity.CanBeMadeEqual)
                 {
-                    UpdateChildrenFromOtherDocument(newNode.ChildNodes[index], oldNode.ChildNodes[index]);
+                    equal = MakeEqual(oldChildren[index], newChildren[index]);
+                }
+
+                if (equal == Similarity.Equal)
+                {
+                    UpdateChildrenFromOtherDocument(oldChildren[index], newChildren[index]);
                     continue;
                 }
 
-                int oldIndex = IndexOf(oldNode.ChildNodes, newNode.ChildNodes[index], index + 1);
-                int newIndex = IndexOf(newNode.ChildNodes, oldNode.ChildNodes[index], index + 1);
+                int oldIndex = oldChildren.IndexOf(newChildren[index], index + 1);
+                int newIndex = newChildren.IndexOf(oldChildren[index], index + 1);
                 if (newIndex >= 0 && (oldIndex < 0 || oldIndex > newIndex))
                 {
                     // insert from newIndex
-                    var importNode = oldDocument.ImportNode(newNode.ChildNodes[newIndex], true);
-                    oldNode.InsertBefore(importNode, oldNode.ChildNodes[index]);
+                    var importNode = oldDocument.ImportNode(newChildren[newIndex], true);
+                    oldChildren.InsertBefore(importNode, oldChildren[index]);
                 }
                 else
                 {
                     // delete
-                    oldNode.RemoveChild(oldNode.ChildNodes[index]);
+                    oldChildren.RemoveChild(oldChildren[index]);
                 }
             }
 
-            while (oldNode.ChildNodes.Count > newNode.ChildNodes.Count)
+            while (oldChildren.Count > newChildren.Count)
             {
-                oldNode.RemoveChild(oldNode.ChildNodes[oldNode.ChildNodes.Count - 1]);
+                oldChildren.RemoveChild(oldChildren[oldChildren.Count - 1]);
             }
-#endif
         }
 
-        private static int IndexOf(XmlNodeList list, XmlNode item, int startIndex = 0)
+        // Wrapper around XmlNode that allows to treat Attributes as children instead of ChildNodes.
+        [DebuggerStepThrough]
+        private class XmlNodeChildren : IEnumerable
         {
-            for (int i = startIndex; i < list.Count; i++)
+            private readonly XmlNode _xmlNode;
+            private readonly bool _attributes;
+
+            public XmlNodeChildren(XmlNode xmlNode, bool childrenAreAttributes = false)
             {
-                if (IsEqual(list[i], item))
-                    return i;
+                _xmlNode = xmlNode;
+                _attributes = childrenAreAttributes;
             }
 
-            return -1;
-        }
+            public XmlNode ParentNode => _xmlNode;
+            public int Count => _attributes ? _xmlNode.Attributes.Count : _xmlNode.ChildNodes.Count;
+            public XmlNode this[int i] => _attributes ? _xmlNode.Attributes[i] : _xmlNode.ChildNodes[i];
+            public IEnumerator GetEnumerator() => _attributes ? _xmlNode.Attributes.GetEnumerator() : _xmlNode.GetEnumerator();
 
-        private static bool IsEqual(XmlNode xmlNode1, XmlNode xmlNode2)
-        {
-            if (xmlNode1 == null || xmlNode2 == null)
-                return xmlNode1 == null && xmlNode2 == null;
+            public XmlNode AppendChild(XmlNode newChild) => _attributes
+                ? _xmlNode.Attributes.Append((XmlAttribute)newChild)
+                : _xmlNode.AppendChild(newChild);
 
-            if (xmlNode1.NodeType != xmlNode2.NodeType)
-                return false;
+            public XmlNode InsertBefore(XmlNode newChild, XmlNode refChild) => _attributes
+                ? _xmlNode.Attributes.InsertBefore((XmlAttribute)newChild, (XmlAttribute)refChild)
+                : _xmlNode.InsertBefore(newChild, refChild);
 
-            if (xmlNode1.NodeType == XmlNodeType.Element)
+            public XmlNode RemoveChild(XmlNode oldChild) => _attributes
+                ? _xmlNode.Attributes.Remove((XmlAttribute)oldChild)
+                : _xmlNode.RemoveChild(oldChild);
+
+            public int IndexOf(XmlNode item, int startIndex = 0)
             {
-                if (xmlNode1.Attributes.Count != xmlNode2.Attributes.Count)
-                    return false;
-
-                for (int i = 0; i < xmlNode1.Attributes.Count; i++)
+                for (int i = startIndex; i < Count; i++)
                 {
-                    if (!IsEqual(xmlNode1.Attributes[i], xmlNode2.Attributes[i]))
-                        return false;
+                    if (Compare(this[i], item) == Similarity.Equal)
+                        return i;
+                }
+
+                return -1;
+            }
+        }
+
+        private enum Similarity { Different, CanBeMadeEqual, Equal }
+        private static Similarity Compare(XmlNode oldNode, XmlNode newNode)
+        {
+            if (oldNode.NodeType != newNode.NodeType)
+                return Similarity.Different;
+
+            if (oldNode.NodeType == XmlNodeType.Element)
+            {
+                if (oldNode.Attributes.Count != newNode.Attributes.Count)
+                    return oldNode.IsReadOnly ? Similarity.Different : Similarity.CanBeMadeEqual;
+
+                for (int i = 0; i < oldNode.Attributes.Count; i++)
+                {
+                    if (Compare(oldNode.Attributes[i], newNode.Attributes[i]) != Similarity.Equal)
+                        return oldNode.IsReadOnly ? Similarity.Different : Similarity.CanBeMadeEqual;
                 }
             }
+
+            if (string.Compare(oldNode.Name, newNode.Name, StringComparison.InvariantCulture) != 0 ||
+                string.Compare(oldNode.LocalName, newNode.LocalName, StringComparison.InvariantCulture) != 0)
+                return Similarity.Different;
 
             return
-                string.Compare(xmlNode1.Name, xmlNode2.Name, StringComparison.InvariantCulture) == 0 &&
-                string.Compare(xmlNode1.LocalName, xmlNode2.LocalName, StringComparison.InvariantCulture) == 0 &&
-                string.Compare(xmlNode1.Prefix, xmlNode2.Prefix, StringComparison.InvariantCulture) == 0 &&
-                string.Compare(xmlNode1.Value, xmlNode2.Value, StringComparison.InvariantCulture) == 0;
+                string.Compare(oldNode.Prefix, newNode.Prefix, StringComparison.InvariantCulture) == 0 &&
+                string.Compare(oldNode.Value, newNode.Value, StringComparison.InvariantCulture) == 0
+                ? Similarity.Equal : (oldNode.IsReadOnly ? Similarity.Different : Similarity.CanBeMadeEqual);
+        }
+
+        private static Similarity MakeEqual(XmlNode oldNode, XmlNode newNode)
+        {
+            if (oldNode.NodeType == XmlNodeType.Element)
+                UpdateChildrenFromOtherDocument(new XmlNodeChildren(oldNode, true), new XmlNodeChildren(newNode, true));
+
+            if (string.Compare(oldNode.Prefix, newNode.Prefix, StringComparison.InvariantCulture) != 0)
+                oldNode.Prefix = newNode.Prefix;
+
+            if (string.Compare(oldNode.Value, newNode.Value, StringComparison.InvariantCulture) != 0)
+                oldNode.Value = newNode.Value;
+
+            return Compare(oldNode, newNode);
         }
     }
 }

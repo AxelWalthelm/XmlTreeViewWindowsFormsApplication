@@ -37,10 +37,11 @@
             this.deleteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.buttonWriteData = new System.Windows.Forms.Button();
+            this.buttonReadData = new System.Windows.Forms.Button();
+            this.labelCount = new System.Windows.Forms.Label();
             this.xmlTreeViewGeneric1 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewGeneric();
             this.xmlTreeView2 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
             this.xmlTreeView1 = new XmlTreeViewWindowsFormsApplication.XmlTreeViewSimple();
-            this.buttonReadData = new System.Windows.Forms.Button();
             this.contextMenuStripXmlTreeView.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -115,6 +116,27 @@
             this.buttonWriteData.UseVisualStyleBackColor = true;
             this.buttonWriteData.Click += new System.EventHandler(this.buttonWriteData_Click);
             // 
+            // buttonReadData
+            // 
+            this.buttonReadData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.buttonReadData.Location = new System.Drawing.Point(174, 432);
+            this.buttonReadData.Name = "buttonReadData";
+            this.buttonReadData.Size = new System.Drawing.Size(75, 23);
+            this.buttonReadData.TabIndex = 5;
+            this.buttonReadData.Text = "Read Data";
+            this.buttonReadData.UseVisualStyleBackColor = true;
+            this.buttonReadData.Click += new System.EventHandler(this.buttonReadData_Click);
+            // 
+            // labelCount
+            // 
+            this.labelCount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.labelCount.Location = new System.Drawing.Point(255, 432);
+            this.labelCount.Name = "labelCount";
+            this.labelCount.Size = new System.Drawing.Size(89, 23);
+            this.labelCount.TabIndex = 8;
+            this.labelCount.Text = "0 changes";
+            this.labelCount.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            // 
             // xmlTreeViewGeneric1
             // 
             this.xmlTreeViewGeneric1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -149,22 +171,12 @@
             this.xmlTreeView1.Size = new System.Drawing.Size(236, 413);
             this.xmlTreeView1.TabIndex = 0;
             // 
-            // buttonReadData
-            // 
-            this.buttonReadData.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.buttonReadData.Location = new System.Drawing.Point(174, 432);
-            this.buttonReadData.Name = "buttonReadData";
-            this.buttonReadData.Size = new System.Drawing.Size(75, 23);
-            this.buttonReadData.TabIndex = 5;
-            this.buttonReadData.Text = "Read Data";
-            this.buttonReadData.UseVisualStyleBackColor = true;
-            this.buttonReadData.Click += new System.EventHandler(this.buttonReadData_Click);
-            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(772, 467);
+            this.Controls.Add(this.labelCount);
             this.Controls.Add(this.xmlTreeViewGeneric1);
             this.Controls.Add(this.buttonSave);
             this.Controls.Add(this.buttonReset);
@@ -196,6 +208,7 @@
         private System.Windows.Forms.Timer timer1;
         private System.Windows.Forms.Button buttonWriteData;
         private System.Windows.Forms.Button buttonReadData;
+        private System.Windows.Forms.Label labelCount;
     }
 }
 

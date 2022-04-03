@@ -16,9 +16,10 @@ namespace XmlTreeViewWindowsFormsApplication
 {
     public partial class Form1 : Form
     {
-        public string FilePath = @"C:\tmp\test.xml";
-        public XmlDocument XmlDocument;
-        public XmlAutoSave AutoSave;
+        public readonly string FilePath = @"C:\tmp\test.xml";
+        public readonly XmlDocument XmlDocument;
+        public readonly XmlAutoSave AutoSave;
+        public int ChangeCount = 0;
 
         public Form1()
         {
@@ -27,6 +28,9 @@ namespace XmlTreeViewWindowsFormsApplication
             AutoSave.OnAutoSave += OnAutoSave;
 
             XmlDocument = new XmlDocument();
+            XmlDocument.NodeChanged += OnNodeChanged;
+            XmlDocument.NodeInserted += OnNodeChanged;
+            XmlDocument.NodeRemoved += OnNodeChanged;
 #if false
             LoadDummyXmlDocument();
 #else
@@ -54,6 +58,11 @@ namespace XmlTreeViewWindowsFormsApplication
             this.xmlTreeViewGeneric1.Root = XmlDocument;
             this.xmlTreeViewGeneric1.ExpandAll();
             this.xmlTreeViewGeneric1.WriteConsole();
+        }
+
+        private void OnNodeChanged(object sender, XmlNodeChangedEventArgs e)
+        {
+            labelCount.Text = $"{++ChangeCount} changes";
         }
 
         private void LoadDummyXmlDocument()

@@ -45,7 +45,7 @@ namespace XmlTreeViewWindowsFormsApplication
             {
                 var serializer = new XmlSerializer(dataType, new XmlRootAttribute { ElementName = xmlElement.LocalName, Namespace = "" });
                 var namespaces = new XmlSerializerNamespaces(new[] { XmlQualifiedName.Empty });
-                serializer.Serialize(writer, data);
+                serializer.Serialize(writer, data, namespaces);
             }
 
             UpdateChildrenFromOtherDocument(xmlElement, document.FirstChild);
@@ -61,11 +61,6 @@ namespace XmlTreeViewWindowsFormsApplication
             }
         }
 
-        // Make oldNode have children equal to newNode, but modify only what has changed to avoid flickering,
-        // assuming order of nodes stay the same and that nodes can only be deleted and inserted
-        // (moving a node is both: delete and insert).
-        // Document of newNode differs from the document of oldNode, so we need to copy them by XmlDocument.ImportNode().
-        // When a node is different and needs be copied, all off its children are copied too.
         private static void UpdateChildrenFromOtherDocument(XmlNode oldNode, XmlNode newNode)
         {
 #if false // quick and simple
@@ -77,19 +72,25 @@ namespace XmlTreeViewWindowsFormsApplication
             oldNode.RemoveAll();
             for (int i = 0; i < newNode.ChildNodes.Count; i++)
                 oldNode.AppendChild(oldNode.OwnerDocument.ImportNode(newNode.ChildNodes[i], true));
-#else
+#else // avoid unnecessary modifications of XmlDocument
             if (oldNode.NodeType == XmlNodeType.Element)
                 UpdateChildrenFromOtherDocument(new XmlNodeChildren(oldNode, true), new XmlNodeChildren(newNode, true));
             UpdateChildrenFromOtherDocument(new XmlNodeChildren(oldNode), new XmlNodeChildren(newNode));
 #endif
         }
 
+        // Make oldNode have children equal to newNode, but modify only what has changed to avoid flickering,
+        // assuming order of nodes stay the same and that nodes can only be deleted and inserted
+        // (moving a node is both: delete and insert).
+        // Document of newNode differs from the document of oldNode, so we need to copy them by XmlDocument.ImportNode().
+        // When a node is different and needs be copied, all off its children are copied too.
+        //
+        // Finding the minimal sequence of insert and delete to make oldNode have the same children as newNode
+        // is expensive, but in the most relevant cases only one child was inserted or removed or changed.
+        // So we implement a simpler strategy which has "only" worst case complexity O(n^2) and typical case complexity O(n).
+        // If only the Value or Prefix of a node changes, it can be fixed immediately.
         private static void UpdateChildrenFromOtherDocument(XmlNodeChildren oldChildren, XmlNodeChildren newChildren)
         {
-            // Finding the minimal sequence of insert and delete to make oldNode have the same children as newNode
-            // is expensive, but in the most relevant cases only one child was inserted or removed or changed.
-            // So we implement a simpler strategy which has "only" worst case complexity O(n^2) and typical case complexity O(n).
-            // If only the value of a node changes, it can be fixed immediately.
             if (oldChildren.Count == 0 && newChildren.Count == 0)
                 return;
 
@@ -99,6 +100,7 @@ namespace XmlTreeViewWindowsFormsApplication
             {
                 if (index >= oldChildren.Count)
                 {
+                    // insert
                     var importNode = oldDocument.ImportNode(newChildren[index], true);
                     oldChildren.AppendChild(importNode);
                     continue;
@@ -120,19 +122,21 @@ namespace XmlTreeViewWindowsFormsApplication
                 int newIndex = newChildren.IndexOf(oldChildren[index], index + 1);
                 if (newIndex >= 0 && (oldIndex < 0 || oldIndex > newIndex))
                 {
-                    // insert from newIndex
-                    var importNode = oldDocument.ImportNode(newChildren[newIndex], true);
+                    // insert
+                    var importNode = oldDocument.ImportNode(newChildren[index], true);
                     oldChildren.InsertBefore(importNode, oldChildren[index]);
                 }
                 else
                 {
                     // delete
                     oldChildren.RemoveChild(oldChildren[index]);
+                    index--;
                 }
             }
 
             while (oldChildren.Count > newChildren.Count)
             {
+                // delete
                 oldChildren.RemoveChild(oldChildren[oldChildren.Count - 1]);
             }
         }

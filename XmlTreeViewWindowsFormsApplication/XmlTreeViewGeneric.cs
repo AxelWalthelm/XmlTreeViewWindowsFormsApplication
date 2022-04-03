@@ -51,6 +51,15 @@ namespace XmlTreeViewWindowsFormsApplication
                 treeNode.Remove();
                 _displayedNodes.Remove(xmlNode);
             }
+
+            if (xmlNode.NodeType == XmlNodeType.Attribute)
+            {
+                UpdateNode(xmlOldParentNode);
+            }
+            else if (xmlNode.NodeType == XmlNodeType.Text && xmlOldParentNode.NodeType == XmlNodeType.Attribute)
+            {
+                UpdateAttributeNode((XmlAttribute)xmlOldParentNode);
+            }
         }
 
         protected override void UpdateNode(XmlNode xmlNode)
@@ -67,6 +76,22 @@ namespace XmlTreeViewWindowsFormsApplication
                 UpdateLinks(treeNode);
                 treeNode.UpdateText(this);
             }
+
+            if (xmlNode.NodeType == XmlNodeType.Attribute)
+            {
+                UpdateAttributeNode((XmlAttribute)xmlNode);
+            }
+            else if (xmlNode.NodeType == XmlNodeType.Text && xmlNode.ParentNode?.NodeType == XmlNodeType.Attribute)
+            {
+                UpdateAttributeNode((XmlAttribute)xmlNode.ParentNode);
+            }
+        }
+
+        private void UpdateAttributeNode(XmlAttribute xmlAttributeNode)
+        {
+            // attribute changes are displayed in the corresponding owner element
+            if (xmlAttributeNode.OwnerElement != null)
+                UpdateNode(xmlAttributeNode.OwnerElement);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
